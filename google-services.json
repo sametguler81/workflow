@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "521952446432",
+    "project_id": "workflow-cc284",
+    "storage_bucket": "workflow-cc284.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:521952446432:android:ecb44e1427f0f00edc0d85",
+        "android_client_info": {
+          "package_name": "com.workflow"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB82HC09wIkZIHJghiPa-IYqHiZddBvkOE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
