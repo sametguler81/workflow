@@ -83,7 +83,7 @@ export function LoginScreen({ onNavigateRegister, onNavigateForgotPassword }: Lo
 
                     {/* Form Card */}
                     <View style={[styles.formCard, { backgroundColor: colors.surface }]}>
-                        <Text style={[styles.welcomeTitle, { color: colors.text }]}>Hoş Geldiniz 👋</Text>
+                        <Text style={[styles.welcomeTitle, { color: colors.text }]}>Hoş Geldiniz</Text>
                         <Text style={[styles.welcomeSubtitle, { color: colors.textSecondary }]}>
                             Hesabınıza giriş yapın
                         </Text>

@@ -33,9 +33,10 @@ interface ExpenseListScreenProps {
     onNavigateDetail: (expenseId: string) => void;
     onNavigateCreate: () => void;
     onBack: () => void;
+    showHeader?: boolean;
 }
 
-export function ExpenseListScreen({ onNavigateDetail, onNavigateCreate, onBack }: ExpenseListScreenProps) {
+export function ExpenseListScreen({ onNavigateDetail, onNavigateCreate, onBack, showHeader = true }: ExpenseListScreenProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -47,6 +48,7 @@ export function ExpenseListScreen({ onNavigateDetail, onNavigateCreate, onBack }
 
     // Filters
     const [filterModalVisible, setFilterModalVisible] = useState(false);
+    const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
     const [filters, setFilters] = useState<ExpenseFilter>({
         status: 'all',
         startDate: undefined,
@@ -75,7 +77,11 @@ export function ExpenseListScreen({ onNavigateDetail, onNavigateCreate, onBack }
                 : await getUserExpenses(profile.uid, profile.companyId, LIMIT, currentLastDoc, filters);
 
             if (loadMore) {
-                setExpenses((prev) => [...prev, ...result.data]);
+                setExpenses((prev) => {
+                    const existingIds = new Set(prev.map(e => e.id));
+                    const newExpenses = result.data.filter(e => !existingIds.has(e.id));
+                    return [...prev, ...newExpenses];
+                });
             } else {
                 setExpenses(result.data);
             }
@@ -126,7 +132,23 @@ export function ExpenseListScreen({ onNavigateDetail, onNavigateCreate, onBack }
 
     const applyFilters = (newFilters: any) => {
         setFilters(newFilters);
+        // If status changes in modal, update tab too if it matches one of the known tabs
+        if (newFilters.status && ['all', 'pending', 'approved', 'rejected'].includes(newFilters.status)) {
+            setActiveTab(newFilters.status);
+        }
     };
+
+    const applyTab = (tab: typeof activeTab) => {
+        setActiveTab(tab);
+        setFilters(prev => ({ ...prev, status: tab === 'all' ? 'all' : tab }));
+    };
+
+    const tabs: { key: typeof activeTab; label: string }[] = [
+        { key: 'all', label: 'Tümü' },
+        { key: 'pending', label: 'Bekleyen' },
+        { key: 'approved', label: 'Onaylı' },
+        { key: 'rejected', label: 'Red' },
+    ];
 
     const handleDelete = (expense: Expense) => {
         const ref = swipeableRefs.current.get(expense.id);
@@ -178,24 +200,52 @@ export function ExpenseListScreen({ onNavigateDetail, onNavigateCreate, onBack }
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-                    <Ionicons name="arrow-back" size={24} color={colors.text} />
-                </TouchableOpacity>
-                <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                    <Text style={[styles.headerTitle, { color: colors.text }]}>
-                        {isReviewer ? 'Tüm Fişler' : 'Fişlerim'}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                        {expenses.length} kayıt
-                    </Text>
+            {showHeader && (
+                <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+                    <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+                        <Ionicons name="arrow-back" size={24} color={colors.text} />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1, paddingHorizontal: 12 }}>
+                        <Text style={[styles.headerTitle, { color: colors.text }]}>
+                            {isReviewer ? 'Tüm Fişler' : 'Fişlerim'}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                            {expenses.length} kayıt
+                        </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setFilterModalVisible(true)} style={styles.filterBtn}>
+                        <Ionicons name="options-outline" size={24} color={Colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={onNavigateCreate} style={styles.addBtn}>
+                        <Ionicons name="add-circle" size={28} color={Colors.primary} />
+                    </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => setFilterModalVisible(true)} style={styles.filterBtn}>
-                    <Ionicons name="options-outline" size={24} color={Colors.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={onNavigateCreate} style={styles.addBtn}>
-                    <Ionicons name="add-circle" size={28} color={Colors.primary} />
-                </TouchableOpacity>
+            )}
+
+            {/* Tabs */}
+            <View style={[styles.tabRow, { backgroundColor: colors.surface, borderBottomColor: colors.borderLight }]}>
+                {tabs.map((tab) => (
+                    <TouchableOpacity
+                        key={tab.key}
+                        style={[
+                            styles.tab,
+                            activeTab === tab.key && { borderBottomColor: Colors.primary, borderBottomWidth: 2 },
+                        ]}
+                        onPress={() => applyTab(tab.key)}
+                    >
+                        <Text
+                            style={[
+                                styles.tabText,
+                                {
+                                    color: activeTab === tab.key ? Colors.primary : colors.textTertiary,
+                                    fontWeight: activeTab === tab.key ? '700' : '500',
+                                },
+                            ]}
+                        >
+                            {tab.label}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
             </View>
 
             {/* Active Filters Summary */}
@@ -361,4 +411,17 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     deleteText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
+    tabRow: {
+        flexDirection: 'row',
+        borderBottomWidth: 1,
+        paddingHorizontal: Spacing.md,
+    },
+    tab: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 12,
+    },
+    tabText: {
+        fontSize: 13,
+    },
 });

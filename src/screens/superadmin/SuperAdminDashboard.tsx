@@ -14,6 +14,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { Colors, Spacing, BorderRadius, Shadows, Typography } from '../../theme/theme';
 import { getPlatformStats, PlatformStats, createCompanyAdmin } from '../../services/superAdminService';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { Avatar } from '../../components/Avatar';
 import { logoutUser } from '../../services/authService';
 import { InputField } from '../../components/InputField';
 import { PremiumButton } from '../../components/PremiumButton';
@@ -116,7 +117,10 @@ export function SuperAdminDashboard({
                             <Text style={styles.headerGreeting}>Admin Panel</Text>
                             <Text style={styles.headerName}>{profile?.displayName || 'Admin'}</Text>
                         </View>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                            <View style={{ marginRight: 8 }}>
+                                <Avatar name={profile?.displayName || 'A'} size={40} imageUrl={profile?.photoURL} />
+                            </View>
                             <TouchableOpacity
                                 style={[styles.logoutBtn, { backgroundColor: Colors.primary }]}
                                 onPress={() => setAddCompanyModal(true)}

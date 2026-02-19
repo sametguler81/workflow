@@ -18,6 +18,8 @@ interface MenuScreenProps {
     onNavigateProfile: () => void;
     onNavigateSettings: () => void;
     onNavigateReports: () => void;
+    onNavigateInvoiceUpload?: () => void;
+    onNavigateDocuments?: () => void;
 }
 
 interface MenuItem {
@@ -35,6 +37,8 @@ export function MenuScreen({
     onNavigateProfile,
     onNavigateSettings,
     onNavigateReports,
+    onNavigateInvoiceUpload,
+    onNavigateDocuments,
 }: MenuScreenProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
@@ -44,10 +48,26 @@ export function MenuScreen({
     const menuItems: MenuItem[] = [
         // Belgeler — sadece idari/muhasebe/admin
         ...(isAdminRole ? [{
+            key: 'upload',
+            icon: 'cloud-upload-outline',
+            label: 'Belge Yükle',
+            subtitle: 'Fatura veya Fiş Yükle',
+            onPress: () => onNavigateInvoiceUpload && onNavigateInvoiceUpload(),
+            color: '#F59E0B', // Amber color for action
+        }] : []),
+        ...(isAdminRole ? [{
+            key: 'documents',
+            icon: 'folder-open-outline',
+            label: 'Belge Yönetimi',
+            subtitle: 'Tüm belge ve fişler',
+            onPress: () => onNavigateDocuments && onNavigateDocuments(),
+            color: '#8B5CF6',
+        }] : []),
+        ...(isAdminRole ? [{
             key: 'invoices',
-            icon: 'document-text-outline',
-            label: 'Belgeler',
-            subtitle: 'Fatura ve belgeler',
+            icon: 'wallet-outline',
+            label: 'Ön Muhasebe',
+            subtitle: 'Gelir, Gider ve Kasa',
             onPress: onNavigateInvoiceList,
             color: '#3B82F6',
         }] : []),
@@ -100,7 +120,7 @@ export function MenuScreen({
                     onPress={onNavigateProfile}
                     activeOpacity={0.7}
                 >
-                    <Avatar name={profile?.displayName || 'U'} size={48} color={Colors.primary} />
+                    <Avatar name={profile?.displayName || 'U'} size={48} color={Colors.primary} imageUrl={profile?.photoURL} />
                     <View style={styles.profileInfo}>
                         <Text style={[styles.profileName, { color: colors.text }]}>
                             {profile?.displayName || 'Kullanıcı'}

@@ -9,6 +9,7 @@ import { Avatar } from './Avatar';
 interface DashboardHeaderProps {
     userName?: string;
     companyName?: string;
+    userPhoto?: string;
     notificationCount?: number;
     onNotificationPress?: () => void;
     onAvatarPress?: () => void;
@@ -18,6 +19,7 @@ interface DashboardHeaderProps {
 export function DashboardHeader({
     userName,
     companyName,
+    userPhoto,
     notificationCount = 0,
     onNotificationPress,
     onAvatarPress,
@@ -70,7 +72,7 @@ export function DashboardHeader({
                     </TouchableOpacity>
 
                     <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.7}>
-                        <Avatar name={userName || 'U'} size={44} />
+                        <Avatar name={userName || 'U'} size={44} imageUrl={userPhoto} />
                     </TouchableOpacity>
                 </View>
             </View>

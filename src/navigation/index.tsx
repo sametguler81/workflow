@@ -53,6 +53,7 @@ import { CreateAnnouncementScreen } from '../screens/announcement/CreateAnnounce
 
 // Invoices / Documents
 import { InvoiceUploadScreen } from '../screens/invoice/InvoiceUploadScreen';
+import { FinanceScreen } from '../screens/finance/FinanceScreen';
 import { InvoiceListScreen } from '../screens/invoice/InvoiceListScreen';
 import { InvoiceDetailScreen } from '../screens/invoice/InvoiceDetailScreen';
 
@@ -61,6 +62,9 @@ import { MenuScreen } from '../screens/menu/MenuScreen';
 
 // Reports
 import { ReportsScreen } from '../screens/reports/ReportsScreen';
+
+// Documents
+import { DocumentManagementScreen } from '../screens/documents/DocumentManagementScreen';
 
 // Super Admin Screens
 import { SuperAdminDashboard } from '../screens/superadmin/SuperAdminDashboard';
@@ -109,6 +113,7 @@ function DashboardScreen({ navigation }: any) {
 
   const navigateLeaveList = () => navigation.navigate('LeaveList');
   const navigateExpenseList = () => navigation.navigate('ExpenseList');
+  const navigateFinance = () => navigation.navigate('Finance'); // New
   const navigateNewLeave = () => navigation.navigate('LeaveRequest');
   const navigateNewExpense = () => navigation.navigate('ExpenseUpload');
   const navigateLeaveDetail = (id: string) => navigation.navigate('LeaveDetail', { leaveId: id });
@@ -123,13 +128,15 @@ function DashboardScreen({ navigation }: any) {
     return (
       <IdariDashboard
         onNavigateLeaveList={navigateLeaveList}
-        onNavigateExpenseList={navigateExpenseList}
+        onNavigateExpenseList={navigateFinance} // Redirect expense list to Finance for Idari
         onNavigateNewLeave={navigateNewLeave}
         onNavigateLeaveDetail={navigateLeaveDetail}
         onNavigateAttendanceQR={navigateAttendanceQR}
         onNavigateAttendanceReport={navigateAttendanceReport}
+        onNavigateGenericReports={() => navigation.navigate('Reports')}
         onNavigateAnnouncements={navigateAnnouncements}
         onNavigateCompanyCalendar={navigateCompanyCalendar}
+        onNavigateDocuments={() => navigation.navigate('DocumentManagement')}
       />
     );
   }
@@ -141,6 +148,8 @@ function DashboardScreen({ navigation }: any) {
         onNavigateExpenseDetail={navigateExpenseDetail}
         onNavigateNewLeave={navigateNewLeave}
         onNavigateAnnouncements={navigateAnnouncements}
+        onNavigateFinance={navigateFinance}
+        onNavigateDocuments={() => navigation.navigate('DocumentManagement')}
       />
     );
   }
@@ -209,7 +218,9 @@ function MenuTabScreen({ navigation }: any) {
 
   return (
     <MenuScreen
-      onNavigateInvoiceList={() => navigation.navigate('InvoiceList')}
+      onNavigateInvoiceList={() => navigation.navigate('Finance')}
+      onNavigateInvoiceUpload={() => navigation.navigate('InvoiceUpload')}
+      onNavigateDocuments={() => navigation.navigate('DocumentManagement')} // New prop
       onNavigateAttendance={handleAttendance}
       onNavigateProfile={() => navigation.navigate('Profile')}
       onNavigateSettings={() => navigation.navigate('Settings')}
@@ -378,8 +389,19 @@ function MainNavigator() {
         )}
       </Stack.Screen>
       <Stack.Screen name="ExpenseUpload">
-        {({ navigation }) => (
-          <ExpenseUploadScreen onBack={() => navigation.goBack()} />
+        {({ navigation, route }) => (
+          <ExpenseUploadScreen
+            onBack={() => navigation.goBack()}
+            route={route}
+          />
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="InvoiceUpload">
+        {({ navigation, route }) => (
+          <InvoiceUploadScreen
+            onBack={() => navigation.goBack()}
+            route={route}
+          />
         )}
       </Stack.Screen>
       <Stack.Screen name="ExpenseList">
@@ -391,14 +413,10 @@ function MainNavigator() {
           />
         )}
       </Stack.Screen>
-      <Stack.Screen name="ExpenseDetail">
-        {({ navigation, route }) => (
-          <ExpenseDetailScreen
-            expenseId={(route.params as any)?.expenseId}
-            onBack={() => navigation.goBack()}
-          />
-        )}
-      </Stack.Screen>
+      <Stack.Screen
+        name="ExpenseDetail"
+        component={ExpenseDetailScreen}
+      />
       <Stack.Screen name="Profile">
         {({ navigation }) => (
           <ProfileScreen onBack={() => navigation.goBack()} />
@@ -460,11 +478,7 @@ function MainNavigator() {
           <CreateAnnouncementScreen onBack={() => navigation.goBack()} />
         )}
       </Stack.Screen>
-      <Stack.Screen name="InvoiceUpload">
-        {({ navigation }) => (
-          <InvoiceUploadScreen onBack={() => navigation.goBack()} />
-        )}
-      </Stack.Screen>
+      {/* InvoiceUpload moved up */}
       <Stack.Screen name="InvoiceList">
         {({ navigation }) => (
           <InvoiceListScreen
@@ -474,17 +488,30 @@ function MainNavigator() {
           />
         )}
       </Stack.Screen>
-      <Stack.Screen name="InvoiceDetail">
-        {({ navigation, route }) => (
-          <InvoiceDetailScreen
-            invoiceId={(route.params as any)?.invoiceId}
-            onBack={() => navigation.goBack()}
-          />
-        )}
-      </Stack.Screen>
+      <Stack.Screen
+        name="InvoiceDetail"
+        component={InvoiceDetailScreen}
+      />
       <Stack.Screen name="CompanyCalendar">
         {({ navigation }) => (
           <CompanyCalendarScreen onBack={() => navigation.goBack()} />
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="DocumentManagement">
+        {({ navigation }) => (
+          <DocumentManagementScreen navigation={navigation} />
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="Finance">
+        {({ navigation }) => (
+          <FinanceScreen
+            onBack={() => navigation.goBack()}
+            onNavigateCreateInvoice={(type) => navigation.navigate('InvoiceUpload', { type })}
+            onNavigateInvoiceDetail={(id) => navigation.navigate('InvoiceDetail', { invoiceId: id })}
+            onNavigateExpenseDetail={(id) => navigation.navigate('ExpenseDetail', { expenseId: id })}
+          />
         )}
       </Stack.Screen>
     </Stack.Navigator>

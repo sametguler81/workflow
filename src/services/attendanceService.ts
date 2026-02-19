@@ -156,14 +156,19 @@ export async function checkIn(
 
     // Yoklama kaydını oluştur
     const now = new Date();
+    // Fix: Adjust for timezone offset to store "Local" time in ISO format
+    // This way 11:00 appears as 11:00 in the database string, avoiding UTC conversion confusion
+    const offset = now.getTimezoneOffset() * 60000; // in milliseconds
+    const localTime = new Date(now.getTime() - offset);
+
     await addDoc(collection(db, 'attendance'), {
         userId,
         userName,
         companyId,
         date: today,
-        checkInTime: now.toISOString(),
+        checkInTime: localTime.toISOString().slice(0, -1), // Remove 'Z' to indicate local time
         qrToken,
-        createdAt: now.toISOString(),
+        createdAt: now.toISOString(), // Keep original creation time for sorting/logs
     });
 
     return { success: true, message: 'Yoklama başarıyla kaydedildi!' };

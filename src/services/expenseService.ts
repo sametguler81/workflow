@@ -27,17 +27,21 @@ export interface Expense {
     amount: number;
     description: string;
     imageUri: string;
-    imageBase64?: string;
+    imageBase64?: string | null;
     date: string;
     status: ExpenseStatus;
-    reviewedBy?: string;
-    reviewNote?: string;
+    paymentMethod: 'personal' | 'company_card';
+    isReimbursed?: boolean;
+    reimbursementDate?: string;
+    reviewedBy?: string | null;
+    reviewNote?: string | null;
     createdAt: string;
     updatedAt?: string;
 }
 
 export interface ExpenseFilter {
     status?: ExpenseStatus | 'all';
+    paymentMethod?: 'personal' | 'company_card' | 'all';
     startDate?: Date; // For createdAt filtering
     endDate?: Date;
 }
@@ -150,6 +154,17 @@ export async function updateExpenseStatus(
     });
 }
 
+export async function updateExpense(
+    expenseId: string,
+    data: Partial<Omit<Expense, 'id' | 'createdAt'>>
+): Promise<void> {
+    const updateData = {
+        ...data,
+        updatedAt: new Date().toISOString(),
+    };
+    await updateDoc(doc(db, 'expenses', expenseId), updateData);
+}
+
 export async function getExpenseById(expenseId: string): Promise<Expense | null> {
     const snap = await getDoc(doc(db, 'expenses', expenseId));
     if (snap.exists()) {
@@ -160,4 +175,11 @@ export async function getExpenseById(expenseId: string): Promise<Expense | null>
 
 export async function deleteExpense(expenseId: string): Promise<void> {
     await deleteDoc(doc(db, 'expenses', expenseId));
+}
+export async function markExpenseAsReimbursed(expenseId: string): Promise<void> {
+    await updateDoc(doc(db, 'expenses', expenseId), {
+        isReimbursed: true,
+        reimbursementDate: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    });
 }

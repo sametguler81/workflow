@@ -99,7 +99,7 @@ export function SettingsScreen({ onBack, onNavigateProfile, onNavigateCompanyMan
                 <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
                     <View style={styles.aboutRow}>
                         <Text style={[styles.aboutLabel, { color: colors.textSecondary }]}>Versiyon</Text>
-                        <Text style={[styles.aboutValue, { color: colors.text }]}>1.0.0</Text>
+                        <Text style={[styles.aboutValue, { color: colors.text }]}>1.0.2</Text>
                     </View>
                     <View style={[styles.aboutRow, { borderBottomWidth: 0 }]}>
                         <Text style={[styles.aboutLabel, { color: colors.textSecondary }]}>Geliştirici</Text>

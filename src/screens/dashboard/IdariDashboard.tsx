@@ -28,8 +28,10 @@ interface IdariDashboardProps {
     onNavigateLeaveDetail: (leaveId: string) => void;
     onNavigateAttendanceQR?: () => void;
     onNavigateAttendanceReport?: () => void;
+    onNavigateGenericReports?: () => void; // General Reports
     onNavigateAnnouncements?: () => void;
     onNavigateCompanyCalendar?: () => void;
+    onNavigateDocuments?: () => void;
 }
 
 export function IdariDashboard({
@@ -39,17 +41,22 @@ export function IdariDashboard({
     onNavigateLeaveDetail,
     onNavigateAttendanceQR,
     onNavigateAttendanceReport,
+    onNavigateGenericReports,
     onNavigateAnnouncements,
     onNavigateCompanyCalendar,
+    onNavigateDocuments,
 }: IdariDashboardProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
     const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [myReceivables, setMyReceivables] = useState(0);
     const [memberCount, setMemberCount] = useState(0);
     const [attendanceCount, setAttendanceCount] = useState(0);
     const [unreadCount, setUnreadCount] = useState(0);
     const [refreshing, setRefreshing] = useState(false);
+    // Create a map for quick member lookup
+    const [memberMap, setMemberMap] = useState<Record<string, any>>({});
 
     const loadData = useCallback(async () => {
         if (!profile) return;
@@ -61,13 +68,22 @@ export function IdariDashboard({
             const d = String(now.getDate()).padStart(2, '0');
             const todayStr = `${y}-${m}-${d}`;
 
+            // Fetch more expenses to ensure we catch debts
             const [lRes, eRes, members, todayAttendance, unread] = await Promise.all([
                 getCompanyLeaves(profile.companyId),
-                getCompanyExpenses(profile.companyId),
+                getCompanyExpenses(profile.companyId, 100),
                 getCompanyMembers(profile.companyId),
                 getAttendanceByDate(profile.companyId, todayStr),
                 getUnreadCount(profile.companyId, profile.uid),
             ]);
+
+            // Calculate Receivables (Company owes me)
+            // Status=Approved, Method=Personal, IsReimbursed!=true
+            const receivables = eRes.data
+                .filter((e: Expense) => e.userId === profile.uid && e.status === 'approved' && e.paymentMethod === 'personal' && !e.isReimbursed)
+                .reduce((sum: number, e: Expense) => sum + Number(e.amount || 0), 0);
+
+            setMyReceivables(receivables);
 
             // Filter members: only 'personel' and 'muhasebe' are subject to attendance
             const targetMembers = members.filter((m: any) => m.role === 'personel' || m.role === 'muhasebe');
@@ -91,9 +107,6 @@ export function IdariDashboard({
         }
     }, [profile]);
 
-    // Create a map for quick member lookup
-    const [memberMap, setMemberMap] = useState<Record<string, any>>({});
-
     // Member map is now handled in loadData to reduce reads
 
     useEffect(() => { loadData(); }, [loadData]);
@@ -111,6 +124,7 @@ export function IdariDashboard({
             <DashboardHeader
                 userName={profile?.displayName}
                 companyName={profile?.companyName}
+                userPhoto={profile?.photoURL}
                 notificationCount={unreadCount}
                 onNotificationPress={onNavigateAnnouncements}
             />
@@ -148,23 +162,27 @@ export function IdariDashboard({
                             color={Colors.secondary}
                         />
                         <ModernStatCard
-                            title="Bugün Yoklama"
-                            value={`${attendanceCount}/${memberCount}`}
-                            icon="scan-outline"
-                            color={Colors.success}
+                            title="Alacaklarım"
+                            value={`₺${myReceivables.toLocaleString('tr-TR')}`}
+                            icon="wallet-outline"
+                            color={Colors.warning}
                         />
                     </View>
 
                     {/* Quick Actions */}
                     <Text style={[styles.sectionTitle, { color: colors.text, marginTop: Spacing.xxl }]}>Hızlı Yönetim</Text>
-                    <View style={styles.actionsRow}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.actionsScrollContent}
+                    >
                         <TouchableOpacity
                             style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
                             onPress={onNavigateNewLeave}
                             activeOpacity={0.7}
                         >
                             <View style={[styles.actionIcon, { backgroundColor: Colors.primary + '10' }]}>
-                                <Ionicons name="add-circle-outline" size={24} color={Colors.primary} />
+                                <Ionicons name="add-circle-outline" size={22} color={Colors.primary} />
                             </View>
                             <Text style={[styles.actionText, { color: colors.text }]}>İzin Talebi</Text>
                         </TouchableOpacity>
@@ -175,7 +193,7 @@ export function IdariDashboard({
                             activeOpacity={0.7}
                         >
                             <View style={[styles.actionIcon, { backgroundColor: Colors.success + '10' }]}>
-                                <Ionicons name="qr-code-outline" size={24} color={Colors.success} />
+                                <Ionicons name="qr-code-outline" size={22} color={Colors.success} />
                             </View>
                             <Text style={[styles.actionText, { color: colors.text }]}>QR Oluştur</Text>
                         </TouchableOpacity>
@@ -186,9 +204,32 @@ export function IdariDashboard({
                             activeOpacity={0.7}
                         >
                             <View style={[styles.actionIcon, { backgroundColor: Colors.accent + '10' }]}>
-                                <Ionicons name="bar-chart-outline" size={24} color={Colors.accent} />
+                                <Ionicons name="stats-chart-outline" size={22} color={Colors.accent} />
                             </View>
-                            <Text style={[styles.actionText, { color: colors.text }]}>Raporlar</Text>
+                            <Text style={[styles.actionText, { color: colors.text }]}>Yoklama Rap.</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                            onPress={onNavigateGenericReports}
+                            disabled={!onNavigateGenericReports}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#F59E0B' + '10' }]}>
+                                <Ionicons name="documents-outline" size={22} color="#F59E0B" />
+                            </View>
+                            <Text style={[styles.actionText, { color: colors.text }]}>Genel Rapor</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                            onPress={onNavigateDocuments}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#8B5CF6' + '10' }]}>
+                                <Ionicons name="folder-open-outline" size={22} color="#8B5CF6" />
+                            </View>
+                            <Text style={[styles.actionText, { color: colors.text }]}>Belgeler</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -196,12 +237,12 @@ export function IdariDashboard({
                             onPress={onNavigateCompanyCalendar}
                             activeOpacity={0.7}
                         >
-                            <View style={[styles.actionIcon, { backgroundColor: '#8B5CF6' + '10' }]}>
-                                <Ionicons name="calendar-outline" size={24} color="#8B5CF6" />
+                            <View style={[styles.actionIcon, { backgroundColor: '#EC4899' + '10' }]}>
+                                <Ionicons name="calendar-outline" size={22} color="#EC4899" />
                             </View>
                             <Text style={[styles.actionText, { color: colors.text }]}>Takvim</Text>
                         </TouchableOpacity>
-                    </View>
+                    </ScrollView>
 
                     {/* Pending Leave Requests */}
                     <View style={styles.sectionHeader}>
@@ -246,8 +287,8 @@ export function IdariDashboard({
                         </View>
                     )}
                 </View>
-            </ScrollView>
-        </View>
+            </ScrollView >
+        </View >
     );
 }
 
@@ -266,30 +307,34 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: Spacing.md,
     },
-    actionsRow: {
-        flexDirection: 'row',
-        gap: Spacing.md,
+    actionsScrollContent: {
+        gap: 12,
+        paddingHorizontal: 4,
+        paddingVertical: 8, // Add padding for shadows
     },
     actionCard: {
-        flex: 1,
+        width: 100, // Square shape
+        height: 100,
         alignItems: 'center',
-        padding: Spacing.sm + 4,
-        borderRadius: BorderRadius.xl,
+        justifyContent: 'center',
+        padding: Spacing.sm,
+        borderRadius: 20, // Modern rounded corners (squircle-like)
         borderWidth: 1,
-        ...Shadows.small,
+        ...Shadows.small, // Subtle shadow for depth
     },
     actionIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 16,
+        width: 44,
+        height: 44,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: Spacing.sm,
+        marginBottom: 8,
     },
     actionText: {
-        fontSize: 10,
-        fontWeight: '600',
+        fontSize: 11,
+        fontWeight: '700', // Bolder text for better readability
         textAlign: 'center',
+        letterSpacing: -0.2, // Tighter spacing for modern look
     },
     sectionHeader: {
         flexDirection: 'row',

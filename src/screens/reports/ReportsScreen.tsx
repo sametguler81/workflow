@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../theme/ThemeContext';
 import { Colors, Spacing, BorderRadius, Shadows } from '../../theme/theme';
@@ -62,8 +63,8 @@ function ProgressRow({ label, count, total, color }: {
 }
 
 // ─── Recent Item ────────────────────────────────────────
-function RecentItem({ title, subtitle, status, amount }: {
-    title: string; subtitle: string; status: string; amount?: string;
+function RecentItem({ title, subtitle, status, amount, onPress }: {
+    title: string; subtitle: string; status: string; amount?: string; onPress?: () => void;
 }) {
     const { colors } = useTheme();
     const statusConfig: Record<string, { color: string; label: string }> = {
@@ -73,8 +74,14 @@ function RecentItem({ title, subtitle, status, amount }: {
     };
     const s = statusConfig[status] || statusConfig.pending;
 
+    const Container = onPress ? TouchableOpacity : View;
+
     return (
-        <View style={[styles.recentItem, { borderBottomColor: colors.borderLight }]}>
+        <Container
+            style={[styles.recentItem, { borderBottomColor: colors.borderLight }]}
+            onPress={onPress}
+            activeOpacity={0.7}
+        >
             <View style={{ flex: 1 }}>
                 <Text style={[styles.recentTitle, { color: colors.text }]}>{title}</Text>
                 <Text style={[styles.recentSubtitle, { color: colors.textTertiary }]}>{subtitle}</Text>
@@ -83,7 +90,7 @@ function RecentItem({ title, subtitle, status, amount }: {
             <View style={[styles.statusBadge, { backgroundColor: s.color + '15' }]}>
                 <Text style={[styles.statusText, { color: s.color }]}>{s.label}</Text>
             </View>
-        </View>
+        </Container>
     );
 }
 
@@ -91,7 +98,9 @@ function RecentItem({ title, subtitle, status, amount }: {
 export function ReportsScreen({ onBack }: ReportsScreenProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
+    const navigation = useNavigation<any>();
     const [activeTab, setActiveTab] = useState<TabKey>(profile?.role === 'muhasebe' ? 'expenses' : 'leaves');
+
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -101,6 +110,11 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
 
     const companyId = profile?.companyId || '';
+
+    // Navigation Handlers
+    const handleLeavePress = (id: string) => navigation.navigate('LeaveDetail', { leaveId: id });
+    const handleExpensePress = (id: string) => navigation.navigate('ExpenseDetail', { expenseId: id });
+    const handleInvoicePress = (id: string) => navigation.navigate('InvoiceDetail', { invoiceId: id });
 
     const fetchData = useCallback(async () => {
         if (!companyId) return;
@@ -146,6 +160,10 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
         totalAmount: expenses.reduce((sum, e) => sum + (e.amount || 0), 0),
         approvedAmount: expenses.filter(e => e.status === 'approved').reduce((sum, e) => sum + (e.amount || 0), 0),
         pendingAmount: expenses.filter(e => e.status === 'pending').reduce((sum, e) => sum + (e.amount || 0), 0),
+        byMethod: {
+            company_card: expenses.filter(e => e.paymentMethod === 'company_card').length,
+            personal: expenses.filter(e => e.paymentMethod === 'personal').length,
+        }
     };
 
     const invoiceStats = {
@@ -162,8 +180,24 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
         },
     };
 
+    const parseDate = (dateStr: string) => {
+        if (!dateStr) return new Date();
+        // Handle DD.MM.YYYY format
+        if (dateStr.includes('.')) {
+            const parts = dateStr.split('.');
+            if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1;
+                const year = parseInt(parts[2], 10);
+                return new Date(year, month, day);
+            }
+        }
+        // Handle ISO or other formats
+        return new Date(dateStr);
+    };
+
     const formatCurrency = (n: number) => `₺${n.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`;
-    const formatDate = (d: string) => new Date(d).toLocaleDateString('tr-TR');
+    const formatDate = (d: string) => parseDate(d).toLocaleDateString('tr-TR');
 
     const allTabs: { key: TabKey; label: string; icon: string }[] = [
         { key: 'leaves', label: 'İzinler', icon: 'calendar-outline' },
@@ -218,6 +252,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                         title={l.userName}
                         subtitle={`${leaveTypeLabels[l.type] || l.type} • ${formatDate(l.startDate)} - ${formatDate(l.endDate)}`}
                         status={l.status}
+                        onPress={() => handleLeavePress(l.id)}
                     />
                 ))}
                 {leaves.length === 0 && <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Henüz izin talebi yok</Text>}
@@ -230,8 +265,8 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
             <View style={styles.statsGrid}>
                 <StatCard label="Toplam" value={expenseStats.total} icon="layers-outline" color="#3B82F6" bgColor="#3B82F612" />
                 <StatCard label="Toplam Tutar" value={formatCurrency(expenseStats.totalAmount)} icon="cash-outline" color="#059669" bgColor="#05966912" />
-                <StatCard label="Onaylı Tutar" value={formatCurrency(expenseStats.approvedAmount)} icon="checkmark-circle-outline" color={Colors.success} bgColor={Colors.successLight} />
-                <StatCard label="Bekleyen Tutar" value={formatCurrency(expenseStats.pendingAmount)} icon="time-outline" color={Colors.warning} bgColor={Colors.warningLight} />
+                <StatCard label="Şirket Kartı" value={expenseStats.byMethod.company_card} icon="card-outline" color={Colors.warning} bgColor={Colors.warningLight} />
+                <StatCard label="Kendi Cebinden" value={expenseStats.byMethod.personal} icon="person-outline" color={Colors.primary} bgColor={Colors.primaryLight} />
             </View>
 
             <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
@@ -247,9 +282,10 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                     <RecentItem
                         key={e.id}
                         title={e.userName}
-                        subtitle={formatDate(e.date)}
+                        subtitle={`${formatDate(e.date)} • ${e.paymentMethod === 'company_card' ? 'Şirket Kartı' : 'Kendi Cebinden'}`}
                         status={e.status}
                         amount={formatCurrency(e.amount)}
+                        onPress={() => handleExpensePress(e.id)}
                     />
                 ))}
                 {expenses.length === 0 && <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Henüz fiş yok</Text>}
@@ -267,7 +303,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
             </View>
 
             <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Belge Türü Dağılımı</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Kategori Dağılımı</Text>
                 {Object.entries(invoiceStats.byType).map(([key, count]) => (
                     <ProgressRow key={key} label={DOCUMENT_TYPE_LABELS[key as DocumentType] || key} count={count} total={invoiceStats.total} color="#3B82F6" />
                 ))}
@@ -281,7 +317,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
             </View>
 
             <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Son Belgeler</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Son İşlemler</Text>
                 {invoices.slice(0, 10).map(i => (
                     <RecentItem
                         key={i.id}
@@ -289,9 +325,10 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                         subtitle={`${DOCUMENT_TYPE_LABELS[i.documentType]} • ${formatDate(i.date)}`}
                         status={i.status}
                         amount={formatCurrency(i.amount)}
+                        onPress={() => handleInvoicePress(i.id)}
                     />
                 ))}
-                {invoices.length === 0 && <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Henüz belge yok</Text>}
+                {invoices.length === 0 && <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Henüz işlem yok</Text>}
             </View>
         </>
     );
@@ -314,19 +351,30 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                 </View>
 
                 {/* Tabs */}
-                <View style={styles.tabRow}>
-                    {tabs.map(tab => (
-                        <TouchableOpacity
-                            key={tab.key}
-                            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-                            onPress={() => setActiveTab(tab.key)}
-                        >
-                            <Ionicons name={tab.icon as any} size={16} color={activeTab === tab.key ? '#FFF' : 'rgba(255,255,255,0.6)'} />
-                            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-                                {tab.label}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
+                {/* Tabs */}
+                <View style={{ marginBottom: 16 }}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: 8 }}
+                    >
+                        {tabs.map(tab => (
+                            <TouchableOpacity
+                                key={tab.key}
+                                style={[
+                                    styles.tab,
+                                    activeTab === tab.key && styles.tabActive,
+                                    { minWidth: 100, paddingHorizontal: 16 }
+                                ]}
+                                onPress={() => setActiveTab(tab.key)}
+                            >
+                                <Ionicons name={tab.icon as any} size={16} color={activeTab === tab.key ? '#FFF' : 'rgba(255,255,255,0.6)'} />
+                                <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+                                    {tab.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
                 </View>
             </LinearGradient>
 

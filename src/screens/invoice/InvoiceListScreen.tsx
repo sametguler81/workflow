@@ -32,9 +32,10 @@ interface InvoiceListScreenProps {
     onNavigateDetail: (invoiceId: string) => void;
     onNavigateCreate: () => void;
     onBack: () => void;
+    showHeader?: boolean;
 }
 
-export function InvoiceListScreen({ onNavigateDetail, onNavigateCreate, onBack }: InvoiceListScreenProps) {
+export function InvoiceListScreen({ onNavigateDetail, onNavigateCreate, onBack, showHeader = true }: InvoiceListScreenProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
     const isAdmin = profile?.role === 'idari' || profile?.role === 'admin' || profile?.role === 'muhasebe';
@@ -60,7 +61,11 @@ export function InvoiceListScreen({ onNavigateDetail, onNavigateCreate, onBack }
                 if (isRefresh) {
                     setInvoices(result.data);
                 } else {
-                    setInvoices((prev) => [...prev, ...result.data]);
+                    setInvoices((prev) => {
+                        const existingIds = new Set(prev.map(i => i.id));
+                        const newInvoices = result.data.filter(i => !existingIds.has(i.id));
+                        return [...prev, ...newInvoices];
+                    });
                 }
                 lastDocRef.current = result.lastDoc;
                 setHasMore(result.data.length === 20);
@@ -193,22 +198,24 @@ export function InvoiceListScreen({ onNavigateDetail, onNavigateCreate, onBack }
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             {/* Header */}
-            <LinearGradient
-                colors={Colors.gradientPrimary as any}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.header}
-            >
-                <View style={styles.headerRow}>
-                    <TouchableOpacity onPress={onBack} style={styles.headerBtn}>
-                        <Ionicons name="arrow-back" size={24} color="#FFF" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Belgeler</Text>
-                    <TouchableOpacity onPress={onNavigateCreate} style={styles.headerBtn}>
-                        <Ionicons name="add-circle" size={28} color="#FFF" />
-                    </TouchableOpacity>
-                </View>
-            </LinearGradient>
+            {showHeader && (
+                <LinearGradient
+                    colors={Colors.gradientPrimary as any}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.header}
+                >
+                    <View style={styles.headerRow}>
+                        <TouchableOpacity onPress={onBack} style={styles.headerBtn}>
+                            <Ionicons name="arrow-back" size={24} color="#FFF" />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>Belgeler</Text>
+                        <TouchableOpacity onPress={onNavigateCreate} style={styles.headerBtn}>
+                            <Ionicons name="add-circle" size={28} color="#FFF" />
+                        </TouchableOpacity>
+                    </View>
+                </LinearGradient>
+            )}
 
             {/* Tabs */}
             <View style={[styles.tabRow, { backgroundColor: colors.surface, borderBottomColor: colors.borderLight }]}>

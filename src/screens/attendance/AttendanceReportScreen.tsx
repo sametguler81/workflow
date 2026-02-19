@@ -72,7 +72,25 @@ export function AttendanceReportScreen({ onBack }: AttendanceReportScreenProps) 
             ]);
 
             // Filter members: only 'personel' and 'muhasebe' are subject to attendance
-            const targetMembers = members.filter((m: any) => m.role === 'personel' || m.role === 'muhasebe');
+            // AND they must be created before or on the selected date
+            const selectedDateEnd = new Date(selectedDate);
+            selectedDateEnd.setHours(23, 59, 59, 999);
+
+            const now = new Date();
+            const isViewingToday = selectedDate.getDate() === now.getDate() &&
+                selectedDate.getMonth() === now.getMonth() &&
+                selectedDate.getFullYear() === now.getFullYear();
+
+            const targetMembers = members.filter((m: any) => {
+                const isRoleMatch = m.role === 'personel' || m.role === 'muhasebe';
+
+                // If viewing today, show everyone (created today or past)
+                if (isViewingToday) return isRoleMatch;
+
+                const memberCreatedAt = m.createdAt ? new Date(m.createdAt) : new Date(0); // If no date, assume old
+                const isDateMatch = memberCreatedAt <= selectedDateEnd;
+                return isRoleMatch && isDateMatch;
+            });
 
             setRecords(attendance);
             setTotalMembers(targetMembers.length);

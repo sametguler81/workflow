@@ -22,6 +22,8 @@ interface MuhasebeDashboardProps {
     onNavigateExpenseDetail: (expenseId: string) => void;
     onNavigateNewLeave: () => void;
     onNavigateAnnouncements?: () => void;
+    onNavigateFinance?: () => void;
+    onNavigateDocuments?: () => void;
 }
 
 export function MuhasebeDashboard({
@@ -29,6 +31,8 @@ export function MuhasebeDashboard({
     onNavigateExpenseDetail,
     onNavigateNewLeave,
     onNavigateAnnouncements,
+    onNavigateFinance,
+    onNavigateDocuments,
 }: MuhasebeDashboardProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
@@ -66,11 +70,16 @@ export function MuhasebeDashboard({
         ? Math.round((approvedExpenses.length / (approvedExpenses.length + rejectedExpenses.length || 1)) * 100)
         : 0;
 
+    const receivables = expenses
+        .filter(e => e.userId === profile?.uid && e.status === 'approved' && e.paymentMethod === 'personal' && !e.isReimbursed)
+        .reduce((sum, e) => sum + e.amount, 0);
+
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             <DashboardHeader
                 userName={profile?.displayName}
                 companyName={profile?.companyName}
+                userPhoto={profile?.photoURL}
                 notificationCount={unreadCount}
                 onNotificationPress={onNavigateAnnouncements}
             />
@@ -102,16 +111,16 @@ export function MuhasebeDashboard({
 
                     <View style={[styles.statsGrid, { marginTop: Spacing.md }]}>
                         <ModernStatCard
-                            title="Onay Oranı"
-                            value={`%${approvalRate}`}
-                            icon="analytics-outline"
-                            color={Colors.info}
-                        />
-                        <ModernStatCard
                             title="Toplam Fiş"
                             value={expenses.length}
                             icon="receipt-outline"
                             color={Colors.secondary}
+                        />
+                        <ModernStatCard
+                            title="Alacaklarım"
+                            value={`₺${receivables.toFixed(2)}`}
+                            icon="cash-outline"
+                            color={Colors.info}
                         />
                     </View>
 
@@ -139,20 +148,48 @@ export function MuhasebeDashboard({
                         </View>
                     </View>
 
-                    {/* Quick Action */}
+                    {/* Quick Action Grid */}
                     <Text style={[styles.sectionTitle, { color: colors.text, marginTop: Spacing.xxl }]}>İşlemler</Text>
-                    <View style={styles.actionsRow}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.actionsScrollContent}
+                    >
                         <TouchableOpacity
                             style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
                             onPress={onNavigateNewLeave}
                             activeOpacity={0.7}
                         >
                             <View style={[styles.actionIcon, { backgroundColor: Colors.primary + '10' }]}>
-                                <Ionicons name="add-circle-outline" size={24} color={Colors.primary} />
+                                <Ionicons name="add-circle-outline" size={22} color={Colors.primary} />
                             </View>
-                            <Text style={[styles.actionText, { color: colors.text }]}>İzin Talebi Oluştur</Text>
+                            <Text style={[styles.actionText, { color: colors.text }]}>İzin Talebi</Text>
                         </TouchableOpacity>
-                    </View>
+
+                        <TouchableOpacity
+                            style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                            onPress={onNavigateFinance}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: Colors.secondary + '10' }]}>
+                                <Ionicons name="wallet-outline" size={22} color={Colors.secondary} />
+                            </View>
+                            <Text style={[styles.actionText, { color: colors.text }]}>Ön Muhasebe</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                            onPress={onNavigateDocuments}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#8B5CF6' + '10' }]}>
+                                <Ionicons name="folder-open-outline" size={22} color="#8B5CF6" />
+                            </View>
+                            <Text style={[styles.actionText, { color: colors.text }]}>Belgeler</Text>
+                        </TouchableOpacity>
+
+                        {/* Add more scrollable items here if needed later */}
+                    </ScrollView>
 
                     {/* Pending Expenses */}
                     <View style={styles.sectionHeader}>
@@ -259,29 +296,34 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '600',
     },
-    actionsRow: {
-        flexDirection: 'row',
+    actionsScrollContent: {
+        gap: 12,
+        paddingHorizontal: 4,
+        paddingVertical: 8,
     },
     actionCard: {
-        flex: 1,
+        width: 100, // Square shape
+        height: 100,
         alignItems: 'center',
-        padding: Spacing.sm + 4,
-        borderRadius: BorderRadius.xl,
+        justifyContent: 'center',
+        padding: Spacing.sm,
+        borderRadius: 20,
         borderWidth: 1,
         ...Shadows.small,
     },
     actionIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 16,
+        width: 44,
+        height: 44,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: Spacing.sm,
+        marginBottom: 8,
     },
     actionText: {
-        fontSize: 10,
-        fontWeight: '600',
+        fontSize: 11,
+        fontWeight: '700',
         textAlign: 'center',
+        letterSpacing: -0.2,
     },
     listItem: {
         flexDirection: 'row',

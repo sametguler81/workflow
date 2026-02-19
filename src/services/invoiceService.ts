@@ -19,6 +19,8 @@ const db = getFirestore();
 
 export type DocumentType = 'fatura' | 'makbuz' | 'sozlesme' | 'diger';
 export type InvoiceStatus = 'pending' | 'approved' | 'rejected';
+export type TransactionDirection = 'income' | 'expense';
+export type PaymentStatus = 'paid' | 'unpaid' | 'partial';
 
 export interface Invoice {
     id: string;
@@ -29,11 +31,15 @@ export interface Invoice {
     amount: number;
     description: string;
     imageUri: string;
-    imageBase64?: string;
+    imageBase64?: string | null;
     date: string;
     status: InvoiceStatus;
-    reviewedBy?: string;
-    reviewNote?: string;
+    direction: TransactionDirection;
+    category: string;
+    paymentStatus: PaymentStatus;
+    dueDate?: string | null;
+    reviewedBy?: string | null;
+    reviewNote?: string | null;
     createdAt: string;
     updatedAt?: string;
 }
@@ -41,6 +47,7 @@ export interface Invoice {
 export interface InvoiceFilter {
     status?: InvoiceStatus | 'all';
     documentType?: DocumentType | 'all';
+    direction?: TransactionDirection | 'all';
     startDate?: Date;
     endDate?: Date;
 }
@@ -133,6 +140,9 @@ export async function getCompanyInvoices(
     if (filter?.documentType && filter.documentType !== 'all') {
         q = query(q, where('documentType', '==', filter.documentType));
     }
+    if (filter?.direction && filter.direction !== 'all') {
+        q = query(q, where('direction', '==', filter.direction));
+    }
     if (filter?.startDate) {
         q = query(q, where('createdAt', '>=', filter.startDate.toISOString()));
     }
@@ -170,6 +180,17 @@ export async function updateInvoiceStatus(
         reviewNote: reviewNote || '',
         updatedAt: new Date().toISOString(),
     });
+}
+
+export async function updateInvoice(
+    invoiceId: string,
+    data: Partial<Omit<Invoice, 'id' | 'createdAt'>>
+): Promise<void> {
+    const updateData = {
+        ...data,
+        updatedAt: new Date().toISOString(),
+    };
+    await updateDoc(doc(db, 'invoices', invoiceId), updateData);
 }
 
 // ─── Get by ID ─────────────────────────────────────────

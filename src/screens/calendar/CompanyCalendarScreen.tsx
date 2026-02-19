@@ -9,6 +9,9 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { getAttendanceByDate, AttendanceRecord } from '../../services/attendanceService';
+import { getCompanyMembers } from '../../services/companyService';
+import { Avatar } from '../../components/Avatar';
 
 // Setup Calendar Locale
 LocaleConfig.locales['tr'] = {
@@ -35,14 +38,29 @@ export function CompanyCalendarScreen({ onBack }: CompanyCalendarScreenProps) {
     const [markedDates, setMarkedDates] = useState<any>({});
     const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [dayLeaves, setDayLeaves] = useState<LeaveRequest[]>([]);
+    const [absentMembers, setAbsentMembers] = useState<any[]>([]);
+    const [companyMembers, setCompanyMembers] = useState<any[]>([]);
+    const [memberMap, setMemberMap] = useState<Record<string, any>>({});
 
     const fetchData = useCallback(async () => {
         if (!profile?.companyId) return;
         try {
             setLoading(true);
-            const result = await getCompanyLeaves(profile.companyId, 100, null, { status: 'approved' });
-            setLeaves(result.data);
-            processLeaves(result.data);
+            const [leavesResult, membersResult] = await Promise.all([
+                getCompanyLeaves(profile.companyId, 100, null, { status: 'approved' }),
+                getCompanyMembers(profile.companyId)
+            ]);
+
+            setLeaves(leavesResult.data);
+            setCompanyMembers(membersResult);
+
+            const map: Record<string, any> = {};
+            membersResult.forEach((m: any) => map[m.uid] = m);
+            setMemberMap(map);
+
+            processLeaves(leavesResult.data);
+            // Initial load for today
+            updateDayDetails(new Date().toISOString().split('T')[0], leavesResult.data, membersResult);
         } catch (err) {
             console.error(err);
             Alert.alert('Hata', 'İzin bilgileri alınamadı.');
@@ -113,34 +131,71 @@ export function CompanyCalendarScreen({ onBack }: CompanyCalendarScreenProps) {
         });
 
         setMarkedDates(marked);
-        updateSelectedDayLeaves(selectedDate, data);
+        // Initial call moved to fetchData
     };
 
-    const updateSelectedDayLeaves = (date: string, allLeaves: LeaveRequest[]) => {
-        const target = new Date(date);
+    const updateDayDetails = async (dateStr: string, currentLeaves: LeaveRequest[], members: any[]) => {
+        // 1. Refresh Leaves for selected day
+        const target = new Date(dateStr);
         target.setHours(0, 0, 0, 0);
-        console.log('Target date for selection:', target);
 
-        const onLeave = allLeaves.filter(l => {
+        const onLeave = currentLeaves.filter(l => {
             const start = parseDate(l.startDate);
             const end = parseDate(l.endDate);
-
             if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
-
             start.setHours(0, 0, 0, 0);
-            end.setHours(0, 0, 0, 0); // Include end date
-
-            const isInside = target >= start && target <= end;
-            if (isInside) console.log(`Leave for ${l.userName} is inside selected date.`);
-            return isInside;
+            end.setHours(0, 0, 0, 0);
+            return target >= start && target <= end;
         });
-
         setDayLeaves(onLeave);
+
+        // 2. Fetch Attendance for selected day and Calculate Absentees
+        try {
+            if (!profile?.companyId) return;
+
+            // Only fetch if date is today or past
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (dateStr > todayStr) {
+                setAbsentMembers([]);
+                return;
+            }
+
+            const attendance = await getAttendanceByDate(profile.companyId, dateStr);
+            const presentIds = new Set(attendance.map((a: AttendanceRecord) => a.userId));
+
+            // Filtering Logic (same as AttendanceReportScreen)
+            const selectedDateEnd = new Date(dateStr);
+            selectedDateEnd.setHours(23, 59, 59, 999);
+
+            const now = new Date();
+            const isViewingToday = new Date(dateStr).getDate() === now.getDate() &&
+                new Date(dateStr).getMonth() === now.getMonth() &&
+                new Date(dateStr).getFullYear() === now.getFullYear();
+
+            const absents = members
+                .filter((m: any) => {
+                    // Role check
+                    const isRoleMatch = m.role === 'personel' || m.role === 'muhasebe';
+                    if (!isRoleMatch) return false;
+
+                    // Date Check
+                    if (isViewingToday) return true;
+                    const memberCreatedAt = m.createdAt ? new Date(m.createdAt) : new Date(0);
+                    return memberCreatedAt <= selectedDateEnd;
+                })
+                .filter((m: any) => !presentIds.has(m.uid)) // Not present
+                .filter((m: any) => !onLeave.some(l => l.userId === m.uid)); // Not on leave
+
+            setAbsentMembers(absents);
+
+        } catch (error) {
+            console.error('Error fetching daily attendance:', error);
+        }
     };
 
     const onDayPress = (day: any) => {
         setSelectedDate(day.dateString);
-        updateSelectedDayLeaves(day.dateString, leaves);
+        updateDayDetails(day.dateString, leaves, companyMembers);
     };
 
     if (loading) return <LoadingSpinner message="Takvim hazırlanıyor..." />;
@@ -232,6 +287,34 @@ export function CompanyCalendarScreen({ onBack }: CompanyCalendarScreenProps) {
                         </View>
                     )}
                 />
+
+                {/* Absent Section */}
+                {absentMembers.length > 0 && (
+                    <View style={{ marginTop: 20 }}>
+                        <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 16 }]}>
+                            Gelmeyenler ({absentMembers.length})
+                        </Text>
+                        {absentMembers.map((member, index) => (
+                            <View key={index} style={[styles.leaveCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+                                <Avatar
+                                    name={member.displayName}
+                                    size={40}
+                                    color={Colors.danger}
+                                    imageUrl={member.photoURL}
+                                />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[styles.userName, { color: colors.text }]}>{member.displayName}</Text>
+                                    <Text style={[styles.leaveType, { color: colors.textSecondary }]}>
+                                        Yoklama verilmedi
+                                    </Text>
+                                </View>
+                                <View style={[styles.statusBadge, { backgroundColor: Colors.danger + '15' }]}>
+                                    <Text style={[styles.statusText, { color: Colors.danger }]}>Yok</Text>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                )}
             </View>
         </View>
     );

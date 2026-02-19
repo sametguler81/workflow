@@ -81,11 +81,16 @@ export function PersonelDashboard({
     const approvedLeaves = leaves.filter((l) => l.status === 'approved').length;
     const pendingExpenses = expenses.filter((e) => e.status === 'pending').length;
 
+    const receivables = expenses
+        .filter(e => e.status === 'approved' && e.paymentMethod === 'personal' && !e.isReimbursed)
+        .reduce((sum, e) => sum + e.amount, 0);
+
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             <DashboardHeader
                 userName={profile?.displayName}
                 companyName={profile?.companyName}
+                userPhoto={profile?.photoURL}
                 notificationCount={unreadCount}
                 onNotificationPress={onNavigateAnnouncements}
             />
@@ -108,9 +113,9 @@ export function PersonelDashboard({
                             color={Colors.warning}
                         />
                         <ModernStatCard
-                            title="Onaylı İzin"
-                            value={approvedLeaves}
-                            icon="checkmark-circle-outline"
+                            title="Alacaklarım"
+                            value={`₺${receivables.toFixed(2)}`}
+                            icon="wallet-outline"
                             color={Colors.success}
                         />
                     </View>
@@ -129,16 +134,21 @@ export function PersonelDashboard({
                         />
                     </View>
 
-                    {/* Quick Actions */}
+
+                    {/* Quick Actions Scroll */}
                     <Text style={[styles.sectionTitle, { color: colors.text, marginTop: Spacing.xxl }]}>Hızlı İşlemler</Text>
-                    <View style={styles.actionsRow}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.actionsScrollContent}
+                    >
                         <TouchableOpacity
                             style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
                             onPress={onNavigateNewLeave}
                             activeOpacity={0.7}
                         >
                             <View style={[styles.actionIcon, { backgroundColor: Colors.primary + '10' }]}>
-                                <Ionicons name="calendar-outline" size={24} color={Colors.primary} />
+                                <Ionicons name="calendar-outline" size={22} color={Colors.primary} />
                             </View>
                             <Text style={[styles.actionText, { color: colors.text }]}>İzin Talebi</Text>
                         </TouchableOpacity>
@@ -149,7 +159,7 @@ export function PersonelDashboard({
                             activeOpacity={0.7}
                         >
                             <View style={[styles.actionIcon, { backgroundColor: Colors.accent + '10' }]}>
-                                <Ionicons name="camera-outline" size={24} color={Colors.accent} />
+                                <Ionicons name="receipt-outline" size={22} color={Colors.accent} />
                             </View>
                             <Text style={[styles.actionText, { color: colors.text }]}>Fiş Yükle</Text>
                         </TouchableOpacity>
@@ -160,24 +170,13 @@ export function PersonelDashboard({
                             activeOpacity={0.7}
                         >
                             <View style={[styles.actionIcon, { backgroundColor: attendanceToday ? Colors.success + '10' : Colors.secondary + '10' }]}>
-                                <Ionicons name={attendanceToday ? 'checkmark-circle' : 'scan-outline'} size={24} color={attendanceToday ? Colors.success : Colors.secondary} />
+                                <Ionicons name={attendanceToday ? 'checkmark-circle' : 'scan-outline'} size={22} color={attendanceToday ? Colors.success : Colors.secondary} />
                             </View>
                             <Text style={[styles.actionText, { color: attendanceToday ? Colors.success : colors.text }]}>
                                 {attendanceToday ? 'Yoklama Tamam' : 'Yoklama'}
                             </Text>
                         </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
-                            onPress={onNavigateCompanyCalendar}
-                            activeOpacity={0.7}
-                        >
-                            <View style={[styles.actionIcon, { backgroundColor: '#8B5CF6' + '10' }]}>
-                                <Ionicons name="calendar-outline" size={24} color="#8B5CF6" />
-                            </View>
-                            <Text style={[styles.actionText, { color: colors.text }]}>Takvim</Text>
-                        </TouchableOpacity>
-                    </View>
+                    </ScrollView>
 
                     {/* Recent Leaves List */}
                     <View style={styles.sectionHeader}>
@@ -233,30 +232,34 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: Spacing.md,
     },
-    actionsRow: {
-        flexDirection: 'row',
-        gap: Spacing.md,
+    actionsScrollContent: {
+        gap: 12,
+        paddingHorizontal: 4,
+        paddingVertical: 8,
     },
     actionCard: {
-        flex: 1,
+        width: 100,
+        height: 100,
         alignItems: 'center',
-        padding: Spacing.sm + 4,
-        borderRadius: BorderRadius.xl,
+        justifyContent: 'center',
+        padding: Spacing.sm,
+        borderRadius: 20,
         borderWidth: 1,
         ...Shadows.small,
     },
     actionIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 16,
+        width: 44,
+        height: 44,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: Spacing.sm,
+        marginBottom: 8,
     },
     actionText: {
-        fontSize: 10,
-        fontWeight: '600',
+        fontSize: 11,
+        fontWeight: '700',
         textAlign: 'center',
+        letterSpacing: -0.2,
     },
     sectionHeader: {
         flexDirection: 'row',
