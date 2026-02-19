@@ -1,7 +1,7 @@
 {
   "name": "workflow",
-  "version": "1.0.0",
   "main": "index.tsx",
+  "version": "1.0.5",
   "scripts": {
     "start": "expo start --dev-client",
     "web": "expo start --web",
