@@ -21,11 +21,14 @@ import { Colors, Spacing, BorderRadius } from '../../theme/theme';
 import {
     getUserLeaves,
     getCompanyLeaves,
+    deleteLeave,
     LeaveRequest,
     getLeaveTypeLabel,
     LeaveFilter,
 } from '../../services/leaveService';
 import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
+import { Swipeable } from 'react-native-gesture-handler';
+import { Animated } from 'react-native';
 
 interface LeaveListScreenProps {
     onNavigateDetail: (leaveId: string) => void;
@@ -49,6 +52,8 @@ export function LeaveListScreen({ onNavigateDetail, onNavigateCreate, onBack }: 
         startDate: undefined,
         endDate: undefined,
     });
+
+    const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
 
     const isManager = profile?.role === 'admin' || profile?.role === 'idari';
     const LIMIT = 20;
@@ -119,6 +124,45 @@ export function LeaveListScreen({ onNavigateDetail, onNavigateCreate, onBack }: 
         setFilters(newFilters);
     };
 
+    const handleDelete = (leave: LeaveRequest) => {
+        const ref = swipeableRefs.current.get(leave.id);
+        ref?.close();
+
+        Alert.alert(
+            'İzni Sil',
+            `"${getLeaveTypeLabel(leave.type)}" talebini silmek istediğinize emin misiniz?`,
+            [
+                { text: 'İptal', style: 'cancel' },
+                {
+                    text: 'Sil',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteLeave(leave.id);
+                            setLeaves((prev) => prev.filter((e) => e.id !== leave.id));
+                            Alert.alert('Başarılı', 'İzin talebi silindi ✅');
+                        } catch (err) {
+                            console.error(err);
+                            Alert.alert('Hata', 'İzin silinemedi.');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, _dragX: Animated.AnimatedInterpolation<number>, leave: LeaveRequest) => {
+        const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [80, 0] });
+        return (
+            <Animated.View style={[styles.deleteAction, { transform: [{ translateX }] }]}>
+                <TouchableOpacity style={styles.deleteButton} onPress={() => handleDelete(leave)}>
+                    <Ionicons name="trash-outline" size={22} color="#FFF" />
+                    <Text style={styles.deleteText}>Sil</Text>
+                </TouchableOpacity>
+            </Animated.View>
+        );
+    };
+
     const renderFooter = () => {
         if (!loadingMore) return null;
         return (
@@ -186,38 +230,83 @@ export function LeaveListScreen({ onNavigateDetail, onNavigateCreate, onBack }: 
                         <LoadingSpinner message="Yükleniyor..." />
                     )
                 }
-                renderItem={({ item }) => (
-                    <TouchableOpacity
-                        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderLight }]}
-                        onPress={() => onNavigateDetail(item.id)}
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.cardTop}>
-                            <View style={styles.cardLeft}>
-                                <Text style={[styles.cardTitle, { color: colors.text }]}>
-                                    {getLeaveTypeLabel(item.type)}
-                                </Text>
-                                {isManager && (
-                                    <Text style={[styles.cardUser, { color: Colors.primary }]}>{item.userName}</Text>
-                                )}
-                            </View>
-                            <StatusBadge status={item.status} />
-                        </View>
-                        <View style={styles.cardBottom}>
-                            <View style={styles.dateRow}>
-                                <Ionicons name="calendar-outline" size={14} color={colors.textTertiary} />
-                                <Text style={[styles.dateText, { color: colors.textSecondary }]}>
-                                    {item.startDate} → {item.endDate}
-                                </Text>
-                            </View>
-                            {item.description ? (
-                                <Text style={[styles.desc, { color: colors.textTertiary }]} numberOfLines={1}>
-                                    {item.description}
-                                </Text>
-                            ) : null}
-                        </View>
-                    </TouchableOpacity>
-                )}
+                renderItem={({ item }) => {
+                    const canDelete = ['admin', 'idari', 'muhasebe'].includes(profile?.role || '');
+
+                    if (!canDelete) {
+                        return (
+                            <TouchableOpacity
+                                style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderLight }]}
+                                onPress={() => onNavigateDetail(item.id)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.cardTop}>
+                                    <View style={styles.cardLeft}>
+                                        <Text style={[styles.cardTitle, { color: colors.text }]}>
+                                            {getLeaveTypeLabel(item.type)}
+                                        </Text>
+                                        {isManager && (
+                                            <Text style={[styles.cardUser, { color: Colors.primary }]}>{item.userName}</Text>
+                                        )}
+                                    </View>
+                                    <StatusBadge status={item.status} />
+                                </View>
+                                <View style={styles.cardBottom}>
+                                    <View style={styles.dateRow}>
+                                        <Ionicons name="calendar-outline" size={14} color={colors.textTertiary} />
+                                        <Text style={[styles.dateText, { color: colors.textSecondary }]}>
+                                            {item.startDate} → {item.endDate}
+                                        </Text>
+                                    </View>
+                                    {item.description ? (
+                                        <Text style={[styles.desc, { color: colors.textTertiary }]} numberOfLines={1}>
+                                            {item.description}
+                                        </Text>
+                                    ) : null}
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    }
+
+                    return (
+                        <Swipeable
+                            ref={(ref) => { if (ref) swipeableRefs.current.set(item.id, ref); }}
+                            renderRightActions={(p, d) => renderRightActions(p, d, item)}
+                            overshootRight={false}
+                        >
+                            <TouchableOpacity
+                                style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderLight }]}
+                                onPress={() => onNavigateDetail(item.id)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.cardTop}>
+                                    <View style={styles.cardLeft}>
+                                        <Text style={[styles.cardTitle, { color: colors.text }]}>
+                                            {getLeaveTypeLabel(item.type)}
+                                        </Text>
+                                        {isManager && (
+                                            <Text style={[styles.cardUser, { color: Colors.primary }]}>{item.userName}</Text>
+                                        )}
+                                    </View>
+                                    <StatusBadge status={item.status} />
+                                </View>
+                                <View style={styles.cardBottom}>
+                                    <View style={styles.dateRow}>
+                                        <Ionicons name="calendar-outline" size={14} color={colors.textTertiary} />
+                                        <Text style={[styles.dateText, { color: colors.textSecondary }]}>
+                                            {item.startDate} → {item.endDate}
+                                        </Text>
+                                    </View>
+                                    {item.description ? (
+                                        <Text style={[styles.desc, { color: colors.textTertiary }]} numberOfLines={1}>
+                                            {item.description}
+                                        </Text>
+                                    ) : null}
+                                </View>
+                            </TouchableOpacity>
+                        </Swipeable>
+                    );
+                }}
             />
 
             <FilterModal
@@ -273,4 +362,20 @@ const styles = StyleSheet.create({
     dateRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     dateText: { fontSize: 13 },
     desc: { fontSize: 12, marginTop: 2 },
+    deleteAction: {
+        marginBottom: Spacing.md,
+        borderRadius: BorderRadius.lg,
+        overflow: 'hidden',
+        justifyContent: 'center',
+    },
+    deleteButton: {
+        backgroundColor: Colors.danger,
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: 75,
+        height: '100%',
+        borderRadius: BorderRadius.lg,
+        gap: 4,
+    },
+    deleteText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
 });

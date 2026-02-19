@@ -21,6 +21,7 @@ import {
     AttendanceRecord,
 } from '../../services/attendanceService';
 import { getCompanyMembers } from '../../services/companyService';
+import { getCompanyLeaves, LeaveRequest } from '../../services/leaveService';
 
 interface AttendanceReportScreenProps {
     onBack: () => void;
@@ -33,7 +34,8 @@ export function AttendanceReportScreen({ onBack }: AttendanceReportScreenProps) 
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [records, setRecords] = useState<AttendanceRecord[]>([]);
     const [totalMembers, setTotalMembers] = useState(0);
-    const [absentMembers, setAbsentMembers] = useState<string[]>([]);
+    const [absentMembers, setAbsentMembers] = useState<{ name: string; isLeave: boolean; uid: string }[]>([]);
+    const [dailyLeaves, setDailyLeaves] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -44,23 +46,61 @@ export function AttendanceReportScreen({ onBack }: AttendanceReportScreenProps) 
         return `${y}-${m}-${d}`;
     };
 
+    const parseDate = (dateStr: string) => {
+        if (!dateStr) return new Date('Invalid');
+        if (dateStr.includes('.')) {
+            const parts = dateStr.split('.');
+            if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1;
+                const year = parseInt(parts[2], 10);
+                return new Date(year, month, day);
+            }
+        }
+        return new Date(dateStr);
+    };
+
     const loadData = useCallback(async () => {
         if (!profile) return;
         try {
             const dateStr = getDateString(selectedDate);
-            const [attendance, members] = await Promise.all([
+            const [attendance, members, leavesResult] = await Promise.all([
                 getAttendanceByDate(profile.companyId, dateStr),
                 getCompanyMembers(profile.companyId),
+                getCompanyLeaves(profile.companyId, 100, null, { status: 'approved' })
             ]);
+
             setRecords(attendance);
             setTotalMembers(members.length);
+            setDailyLeaves(leavesResult.data);
 
             // Find absent members
             const presentIds = new Set(attendance.map((a: AttendanceRecord) => a.userId));
-            const absent = members
+
+            // Filter leaves for selected date
+            const targetDate = new Date(selectedDate);
+            targetDate.setHours(0, 0, 0, 0);
+
+            const absentList = members
                 .filter((m: any) => !presentIds.has(m.uid))
-                .map((m: any) => m.displayName || m.email);
-            setAbsentMembers(absent);
+                .map((m: any) => {
+                    const isOnLeave = leavesResult.data.some((l: LeaveRequest) => {
+                        if (l.userId !== m.uid) return false;
+                        const start = parseDate(l.startDate);
+                        const end = parseDate(l.endDate);
+                        start.setHours(0, 0, 0, 0);
+                        end.setHours(0, 0, 0, 0);
+                        return targetDate >= start && targetDate <= end;
+                    });
+
+                    return {
+                        name: m.displayName || m.email,
+                        uid: m.uid,
+                        isLeave: isOnLeave
+                    };
+                });
+
+            setAbsentMembers(absentList);
         } catch (err) {
             console.error(err);
         } finally {
@@ -215,7 +255,7 @@ export function AttendanceReportScreen({ onBack }: AttendanceReportScreenProps) 
                     {/* Present List */}
                     <View style={styles.sectionHeader}>
                         <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                            Gelenler ✅
+                            Gelenler
                         </Text>
                         <Text style={[styles.sectionCount, { color: colors.textTertiary }]}>
                             {presentCount} kişi
@@ -259,30 +299,36 @@ export function AttendanceReportScreen({ onBack }: AttendanceReportScreenProps) 
                         <>
                             <View style={styles.sectionHeader}>
                                 <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                                    Gelmeyenler ❌
+                                    Gelmeyenler
                                 </Text>
                                 <Text style={[styles.sectionCount, { color: colors.textTertiary }]}>
                                     {absentCount} kişi
                                 </Text>
                             </View>
 
-                            {absentMembers.map((name, index) => (
+                            {absentMembers.map((member, index) => (
                                 <View
                                     key={index}
                                     style={[styles.recordItem, { backgroundColor: colors.card, borderColor: colors.borderLight }]}
                                 >
-                                    <Avatar name={name} size={40} color="#FF6B6B" />
+                                    <Avatar name={member.name} size={40} color={member.isLeave ? Colors.warning : "#FF6B6B"} />
                                     <View style={styles.recordInfo}>
                                         <Text style={[styles.recordName, { color: colors.text }]}>
-                                            {name}
+                                            {member.name}
                                         </Text>
                                         <Text style={[styles.recordTime, { color: colors.textTertiary }]}>
-                                            Yoklama verilmedi
+                                            {member.isLeave ? 'İzinli' : 'Yoklama verilmedi'}
                                         </Text>
                                     </View>
-                                    <View style={[styles.timeBadge, { backgroundColor: Colors.dangerLight }]}>
-                                        <Ionicons name="close-outline" size={14} color={Colors.danger} />
-                                        <Text style={[styles.absentBadgeText]}>Yok</Text>
+                                    <View style={[styles.timeBadge, { backgroundColor: member.isLeave ? Colors.warningLight : Colors.dangerLight }]}>
+                                        <Ionicons
+                                            name={member.isLeave ? "checkmark-circle-outline" : "close-outline"}
+                                            size={14}
+                                            color={member.isLeave ? Colors.warning : Colors.danger}
+                                        />
+                                        <Text style={[styles.absentBadgeText, { color: member.isLeave ? Colors.warning : Colors.danger }]}>
+                                            {member.isLeave ? 'İzinli' : 'Yok'}
+                                        </Text>
                                     </View>
                                 </View>
                             ))}

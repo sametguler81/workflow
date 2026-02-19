@@ -10,7 +10,6 @@ import {
     ScrollView,
     Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../theme/ThemeContext';
@@ -181,32 +180,29 @@ export function AnnouncementListScreen({ onBack, onNavigateCreate }: Announcemen
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            {/* Header */}
-            <LinearGradient
-                colors={['#667eea', '#764ba2'] as any}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.header}
-            >
-                <View style={styles.headerRow}>
-                    <TouchableOpacity onPress={onBack} style={styles.headerBtn}>
-                        <Ionicons name="arrow-back" size={24} color="#FFF" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Duyurular</Text>
-                    {canCreate ? (
-                        <TouchableOpacity onPress={onNavigateCreate} style={styles.headerBtn}>
-                            <Ionicons name="add-circle" size={28} color="#FFF" />
-                        </TouchableOpacity>
-                    ) : (
-                        <View style={{ width: 40 }} />
-                    )}
+            {/* Standard Header */}
+            <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+                <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+                    <Ionicons name="arrow-back" size={24} color={colors.text} />
+                </TouchableOpacity>
+                <View style={{ flex: 1, paddingHorizontal: 12 }}>
+                    <Text style={[styles.headerTitle, { color: colors.text }]}>
+                        Duyurular
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                        {announcements.filter(isUnread).length > 0
+                            ? `${announcements.filter(isUnread).length} okunmamış`
+                            : 'Hepsi okundu'}
+                    </Text>
                 </View>
-                <Text style={styles.headerSub}>
-                    {announcements.filter(isUnread).length > 0
-                        ? `${announcements.filter(isUnread).length} okunmamış duyuru`
-                        : 'Tüm duyurular okundu ✓'}
-                </Text>
-            </LinearGradient>
+                {canCreate ? (
+                    <TouchableOpacity onPress={onNavigateCreate} style={styles.addBtn}>
+                        <Ionicons name="add-circle" size={28} color={Colors.primary} />
+                    </TouchableOpacity>
+                ) : (
+                    <View style={styles.addBtn} />
+                )}
+            </View>
 
             {/* List */}
             <FlatList
@@ -311,20 +307,16 @@ export function AnnouncementListScreen({ onBack, onNavigateCreate }: Announcemen
 const styles = StyleSheet.create({
     container: { flex: 1 },
     header: {
-        paddingTop: 55,
-        paddingBottom: 24,
-        paddingHorizontal: Spacing.xl,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-    },
-    headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        paddingTop: 55,
+        paddingBottom: 16,
+        paddingHorizontal: Spacing.xl,
+        borderBottomWidth: 1,
     },
-    headerBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-    headerTitle: { fontSize: 20, fontWeight: '800', color: '#FFF' },
-    headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 13, marginTop: 8, textAlign: 'center', fontWeight: '500' },
+    backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+    addBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
+    headerTitle: { fontSize: 18, fontWeight: '700' },
     list: { padding: Spacing.lg, paddingBottom: 40 },
     card: {
         borderRadius: BorderRadius.xl,

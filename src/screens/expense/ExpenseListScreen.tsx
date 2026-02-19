@@ -228,34 +228,63 @@ export function ExpenseListScreen({ onNavigateDetail, onNavigateCreate, onBack }
                         <LoadingSpinner message="Yükleniyor..." />
                     )
                 }
-                renderItem={({ item }) => (
-                    <Swipeable
-                        ref={(ref) => { if (ref) swipeableRefs.current.set(item.id, ref); }}
-                        renderRightActions={(p, d) => renderRightActions(p, d, item)}
-                        overshootRight={false}
-                    >
-                        <TouchableOpacity
-                            style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderLight }]}
-                            onPress={() => onNavigateDetail(item.id)}
-                            activeOpacity={0.7}
+                renderItem={({ item }) => {
+                    const canDelete = ['admin', 'idari', 'muhasebe'].includes(profile?.role || '');
+
+                    if (!canDelete) {
+                        return (
+                            <TouchableOpacity
+                                style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderLight }]}
+                                onPress={() => onNavigateDetail(item.id)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.cardContent}>
+                                    <View style={[styles.amountBadge, { backgroundColor: Colors.primary + '15' }]}>
+                                        <Text style={styles.amountText}>₺{item.amount.toFixed(2)}</Text>
+                                    </View>
+                                    <View style={styles.cardInfo}>
+                                        <Text style={[styles.cardTitle, { color: colors.text }]}>
+                                            {item.description || 'Fiş/Fatura'}
+                                        </Text>
+                                        <Text style={[styles.cardSub, { color: colors.textTertiary }]}>
+                                            {item.userName} • {item.date}
+                                        </Text>
+                                    </View>
+                                    <StatusBadge status={item.status} size="sm" />
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    }
+
+                    return (
+                        <Swipeable
+                            ref={(ref) => { if (ref) swipeableRefs.current.set(item.id, ref); }}
+                            renderRightActions={(p, d) => renderRightActions(p, d, item)}
+                            overshootRight={false}
                         >
-                            <View style={styles.cardContent}>
-                                <View style={[styles.amountBadge, { backgroundColor: Colors.primary + '15' }]}>
-                                    <Text style={styles.amountText}>₺{item.amount.toFixed(2)}</Text>
+                            <TouchableOpacity
+                                style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderLight }]}
+                                onPress={() => onNavigateDetail(item.id)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.cardContent}>
+                                    <View style={[styles.amountBadge, { backgroundColor: Colors.primary + '15' }]}>
+                                        <Text style={styles.amountText}>₺{item.amount.toFixed(2)}</Text>
+                                    </View>
+                                    <View style={styles.cardInfo}>
+                                        <Text style={[styles.cardTitle, { color: colors.text }]}>
+                                            {item.description || 'Fiş/Fatura'}
+                                        </Text>
+                                        <Text style={[styles.cardSub, { color: colors.textTertiary }]}>
+                                            {item.userName} • {item.date}
+                                        </Text>
+                                    </View>
+                                    <StatusBadge status={item.status} size="sm" />
                                 </View>
-                                <View style={styles.cardInfo}>
-                                    <Text style={[styles.cardTitle, { color: colors.text }]}>
-                                        {item.description || 'Fiş/Fatura'}
-                                    </Text>
-                                    <Text style={[styles.cardSub, { color: colors.textTertiary }]}>
-                                        {item.userName} • {item.date}
-                                    </Text>
-                                </View>
-                                <StatusBadge status={item.status} size="sm" />
-                            </View>
-                        </TouchableOpacity>
-                    </Swipeable>
-                )}
+                            </TouchableOpacity>
+                        </Swipeable>
+                    );
+                }}
             />
 
             <FilterModal

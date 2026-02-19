@@ -29,6 +29,7 @@ interface IdariDashboardProps {
     onNavigateAttendanceQR?: () => void;
     onNavigateAttendanceReport?: () => void;
     onNavigateAnnouncements?: () => void;
+    onNavigateCompanyCalendar?: () => void;
 }
 
 export function IdariDashboard({
@@ -39,6 +40,7 @@ export function IdariDashboard({
     onNavigateAttendanceQR,
     onNavigateAttendanceReport,
     onNavigateAnnouncements,
+    onNavigateCompanyCalendar,
 }: IdariDashboardProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
@@ -97,7 +99,7 @@ export function IdariDashboard({
             >
                 <View style={styles.content}>
                     {/* Stats */}
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Genel Durum 📊</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Genel Durum</Text>
                     <View style={styles.statsGrid}>
                         <ModernStatCard
                             title="Bekleyen İzin"
@@ -163,11 +165,22 @@ export function IdariDashboard({
                             </View>
                             <Text style={[styles.actionText, { color: colors.text }]}>Raporlar</Text>
                         </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                            onPress={onNavigateCompanyCalendar}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#8B5CF6' + '10' }]}>
+                                <Ionicons name="calendar-outline" size={24} color="#8B5CF6" />
+                            </View>
+                            <Text style={[styles.actionText, { color: colors.text }]}>Takvim</Text>
+                        </TouchableOpacity>
                     </View>
 
                     {/* Pending Leave Requests */}
                     <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 0 }]}>Bekleyen İzinler ⏳</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 0 }]}>Bekleyen İzinler</Text>
                         <TouchableOpacity onPress={onNavigateLeaveList}>
                             <Text style={styles.seeAllText}>Tümü</Text>
                         </TouchableOpacity>

@@ -15,7 +15,7 @@ export interface UserProfile {
     uid: string;
     email: string;
     displayName: string;
-    role: 'personel' | 'idari' | 'muhasebe' | 'admin';
+    role: 'personel' | 'idari' | 'muhasebe' | 'admin' | 'superadmin';
     companyId: string;
     companyName?: string;
     createdAt: string;
@@ -24,21 +24,29 @@ export interface UserProfile {
 const authInstance = getAuth();
 const db = getFirestore();
 
+import { PLAN_DETAILS, PlanType } from '../constants/plans';
+
+// ... existing imports ...
+
 export async function registerUser(
     email: string,
     password: string,
     displayName: string,
-    companyName: string
+    companyName: string,
+    plan: PlanType = 'free'
 ): Promise<UserProfile> {
     const cred = await createUserWithEmailAndPassword(authInstance, email, password);
     const companyId = cred.user.uid + '_company';
+
+    // Get plan details
+    const planDetails = PLAN_DETAILS[plan];
 
     // Create company
     await setDoc(doc(db, 'companies', companyId), {
         name: companyName,
         ownerId: cred.user.uid,
-        plan: 'free',
-        userLimit: 5,
+        plan: plan,
+        userLimit: planDetails.userLimit,
         createdAt: new Date().toISOString(),
     });
 

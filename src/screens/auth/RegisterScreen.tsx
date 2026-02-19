@@ -16,6 +16,7 @@ import { PremiumButton } from '../../components/PremiumButton';
 import { Colors, Spacing, BorderRadius } from '../../theme/theme';
 import { useTheme } from '../../theme/ThemeContext';
 import { registerUser } from '../../services/authService';
+import { PLAN_DETAILS, PlanType } from '../../constants/plans';
 
 interface RegisterScreenProps {
     onNavigateLogin: () => void;
@@ -29,6 +30,7 @@ export function RegisterScreen({ onNavigateLogin }: RegisterScreenProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [selectedPlan, setSelectedPlan] = useState<PlanType>('free');
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -52,14 +54,15 @@ export function RegisterScreen({ onNavigateLogin }: RegisterScreenProps) {
     };
 
     const handleNext = () => {
-        if (validateStep1()) setStep(2);
+        if (step === 1 && validateStep1()) setStep(2);
+        else if (step === 2 && validateStep2()) setStep(3);
     };
 
     const handleRegister = async () => {
         if (!validateStep2()) return;
         setLoading(true);
         try {
-            await registerUser(email.trim(), password, displayName.trim(), companyName.trim());
+            await registerUser(email.trim(), password, displayName.trim(), companyName.trim(), selectedPlan);
         } catch (error: any) {
             Alert.alert('Kayıt Hatası', error.message || 'Bir hata oluştu. Lütfen tekrar deneyin.');
         } finally {
@@ -93,7 +96,7 @@ export function RegisterScreen({ onNavigateLogin }: RegisterScreenProps) {
                         </View>
                         <Text style={styles.headerTitle}>Firma Oluştur</Text>
                         <Text style={styles.headerSubtitle}>
-                            {step === 1 ? 'Firma ve yönetici bilgileri' : 'Hesap bilgileri'}
+                            {step === 1 ? 'Firma ve yönetici bilgileri' : step === 2 ? 'Hesap bilgileri' : 'Abonelik Planı Seçimi'}
                         </Text>
 
                         {/* Step Indicator */}
@@ -101,6 +104,8 @@ export function RegisterScreen({ onNavigateLogin }: RegisterScreenProps) {
                             <View style={[styles.stepDot, styles.stepActive]} />
                             <View style={[styles.stepLine, step >= 2 && styles.stepLineActive]} />
                             <View style={[styles.stepDot, step >= 2 && styles.stepActive]} />
+                            <View style={[styles.stepLine, step >= 3 && styles.stepLineActive]} />
+                            <View style={[styles.stepDot, step >= 3 && styles.stepActive]} />
                         </View>
                     </LinearGradient>
 
@@ -136,7 +141,7 @@ export function RegisterScreen({ onNavigateLogin }: RegisterScreenProps) {
                                     style={styles.actionButton}
                                 />
                             </>
-                        ) : (
+                        ) : step === 2 ? (
                             <>
                                 <Text style={[styles.formTitle, { color: colors.text }]}>Hesap Bilgileri</Text>
 
@@ -180,7 +185,67 @@ export function RegisterScreen({ onNavigateLogin }: RegisterScreenProps) {
                                         style={styles.halfButton}
                                     />
                                     <PremiumButton
-                                        title="Kayıt Ol"
+                                        title="Devam Et"
+                                        onPress={handleNext}
+                                        size="lg"
+                                        style={styles.halfButton}
+                                    />
+                                </View>
+                            </>
+                        ) : (
+                            <>
+                                <Text style={[styles.formTitle, { color: colors.text }]}>Plan Seçimi</Text>
+
+                                {Object.entries(PLAN_DETAILS).map(([key, plan]) => {
+                                    const isSelected = selectedPlan === key;
+                                    return (
+                                        <TouchableOpacity
+                                            key={key}
+                                            onPress={() => setSelectedPlan(key as PlanType)}
+                                            activeOpacity={0.9}
+                                            style={[
+                                                styles.planCard,
+                                                {
+                                                    borderColor: isSelected ? Colors.primary : colors.border,
+                                                    backgroundColor: isSelected ? Colors.primary + '10' : colors.card,
+                                                }
+                                            ]}
+                                        >
+                                            <View style={styles.planHeader}>
+                                                <View style={[styles.planIcon, { backgroundColor: plan.color + '20' }]}>
+                                                    <Ionicons name="star" size={16} color={plan.color} />
+                                                </View>
+                                                <View style={styles.flex}>
+                                                    <Text style={[styles.planName, { color: colors.text }]}>{plan.name}</Text>
+                                                    <Text style={[styles.planLimit, { color: colors.textSecondary }]}>{plan.userLimit} Kullanıcı</Text>
+                                                </View>
+                                                <Text style={[styles.planPrice, { color: Colors.primary }]}>
+                                                    {plan.price === 0 ? 'Ücretsiz' : `₺${plan.price}/ay`}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.planDivider} />
+                                            <View style={styles.featuresList}>
+                                                {plan.features.slice(0, 3).map((feature, i) => (
+                                                    <View key={i} style={styles.featureItem}>
+                                                        <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
+                                                        <Text style={[styles.featureText, { color: colors.textSecondary }]}>{feature}</Text>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+
+                                <View style={styles.buttonRow}>
+                                    <PremiumButton
+                                        title="Geri"
+                                        onPress={() => setStep(2)}
+                                        variant="outline"
+                                        size="lg"
+                                        style={styles.halfButton}
+                                    />
+                                    <PremiumButton
+                                        title="Kaydı Tamamla"
                                         onPress={handleRegister}
                                         loading={loading}
                                         size="lg"
@@ -304,5 +369,51 @@ const styles = StyleSheet.create({
     loginLinkBold: {
         fontSize: 14,
         fontWeight: '700',
+    },
+    planCard: {
+        borderWidth: 2,
+        borderRadius: BorderRadius.lg,
+        padding: Spacing.md,
+        marginBottom: Spacing.md,
+    },
+    planHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+        gap: 12,
+    },
+    planIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    planName: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    planLimit: {
+        fontSize: 13,
+    },
+    planPrice: {
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    planDivider: {
+        height: 1,
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        marginBottom: 12,
+    },
+    featuresList: {
+        gap: 6,
+    },
+    featureItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    featureText: {
+        fontSize: 12,
     },
 });

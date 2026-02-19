@@ -2,6 +2,7 @@ import {
     getFirestore,
     doc,
     getDoc,
+    deleteDoc,
     getDocs,
     collection,
     query,
@@ -169,6 +170,10 @@ export async function updateLeaveStatus(
         reviewNote: reviewNote || '',
         updatedAt: new Date().toISOString(),
     });
+}
+
+export async function deleteLeave(leaveId: string): Promise<void> {
+    await deleteDoc(doc(db, 'leaves', leaveId));
 }
 
 export async function getLeaveById(leaveId: string): Promise<LeaveRequest | null> {

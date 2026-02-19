@@ -27,6 +27,7 @@ interface PersonelDashboardProps {
     onNavigateNewExpense: () => void;
     onNavigateAttendance?: () => void;
     onNavigateAnnouncements?: () => void;
+    onNavigateCompanyCalendar?: () => void;
 }
 
 const { width } = Dimensions.get('window');
@@ -38,6 +39,7 @@ export function PersonelDashboard({
     onNavigateNewExpense,
     onNavigateAttendance,
     onNavigateAnnouncements,
+    onNavigateCompanyCalendar,
 }: PersonelDashboardProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
@@ -163,6 +165,17 @@ export function PersonelDashboard({
                             <Text style={[styles.actionText, { color: attendanceToday ? Colors.success : colors.text }]}>
                                 {attendanceToday ? 'Yoklama Tamam' : 'Yoklama'}
                             </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                            onPress={onNavigateCompanyCalendar}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#8B5CF6' + '10' }]}>
+                                <Ionicons name="calendar-outline" size={24} color="#8B5CF6" />
+                            </View>
+                            <Text style={[styles.actionText, { color: colors.text }]}>Takvim</Text>
                         </TouchableOpacity>
                     </View>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { View, TouchableOpacity } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -9,6 +9,10 @@ import { useTheme } from '../theme/ThemeContext';
 import { Colors, Shadows } from '../theme/theme';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Onboarding
+import { OnboardingScreen } from '../screens/onboarding/OnboardingScreen';
 
 // Auth Screens
 import { LoginScreen } from '../screens/auth/LoginScreen';
@@ -55,8 +59,19 @@ import { MenuScreen } from '../screens/menu/MenuScreen';
 // Reports
 import { ReportsScreen } from '../screens/reports/ReportsScreen';
 
+// Super Admin Screens
+import { SuperAdminDashboard } from '../screens/superadmin/SuperAdminDashboard';
+import { AdminCompanyListScreen } from '../screens/superadmin/AdminCompanyListScreen';
+import { AdminCompanyDetailScreen } from '../screens/superadmin/AdminCompanyDetailScreen';
+import { AdminUserManagementScreen } from '../screens/superadmin/AdminUserManagementScreen';
+import { AdminSubscriptionScreen } from '../screens/superadmin/AdminSubscriptionScreen';
+import { AdminReportsScreen } from '../screens/superadmin/AdminReportsScreen';
+import { CompanyCalendarScreen } from '../screens/calendar/CompanyCalendarScreen';
+
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+const AdminTab = createBottomTabNavigator();
+const AdminStack = createNativeStackNavigator();
 
 // ─── Auth Navigator ─────────────────────────────────────
 function AuthNavigator() {
@@ -99,6 +114,7 @@ function DashboardScreen({ navigation }: any) {
   const navigateAttendanceReport = () => navigation.navigate('AttendanceReport');
   const navigateAttendanceScan = () => navigation.navigate('AttendanceScan');
   const navigateAnnouncements = () => navigation.navigate('AnnouncementList');
+  const navigateCompanyCalendar = () => navigation.navigate('CompanyCalendar');
 
   if (role === 'idari' || role === 'admin') {
     return (
@@ -110,6 +126,7 @@ function DashboardScreen({ navigation }: any) {
         onNavigateAttendanceQR={navigateAttendanceQR}
         onNavigateAttendanceReport={navigateAttendanceReport}
         onNavigateAnnouncements={navigateAnnouncements}
+        onNavigateCompanyCalendar={navigateCompanyCalendar}
       />
     );
   }
@@ -133,6 +150,7 @@ function DashboardScreen({ navigation }: any) {
       onNavigateNewExpense={navigateNewExpense}
       onNavigateAttendance={navigateAttendanceScan}
       onNavigateAnnouncements={navigateAnnouncements}
+      onNavigateCompanyCalendar={navigateCompanyCalendar}
     />
   );
 }
@@ -454,16 +472,160 @@ function MainNavigator() {
           />
         )}
       </Stack.Screen>
+      <Stack.Screen name="CompanyCalendar">
+        {({ navigation }) => (
+          <CompanyCalendarScreen onBack={() => navigation.goBack()} />
+        )}
+      </Stack.Screen>
     </Stack.Navigator>
+  );
+}
+
+// ─── Super Admin Tabs ──────────────────────────────────
+function SuperAdminTabs() {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <AdminTab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: colors.tabBar,
+          borderTopColor: colors.tabBarBorder,
+          borderTopWidth: 1,
+          height: 60 + (insets.bottom > 0 ? insets.bottom : 20),
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 20,
+          paddingTop: 10,
+        },
+        tabBarActiveTintColor: Colors.primary,
+        tabBarInactiveTintColor: colors.textTertiary,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+        },
+      }}
+    >
+      <AdminTab.Screen
+        name="AdminDashboardTab"
+        options={{
+          tabBarLabel: 'Dashboard',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="speedometer" size={size} color={color} />
+          ),
+        }}
+      >
+        {({ navigation }) => (
+          <SuperAdminDashboard
+            onNavigateCompanies={() => navigation.navigate('AdminCompaniesTab')}
+            onNavigateUsers={() => navigation.navigate('AdminUsersTab')}
+            onNavigateSubscriptions={() => navigation.navigate('AdminSubscriptionsTab')}
+            onNavigateReports={() => navigation.navigate('AdminReportsTab')}
+            onNavigateCompanyDetail={(id: string) => navigation.navigate('AdminCompanyDetail', { companyId: id })}
+          />
+        )}
+      </AdminTab.Screen>
+      <AdminTab.Screen
+        name="AdminCompaniesTab"
+        options={{
+          tabBarLabel: 'Firmalar',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="business" size={size} color={color} />
+          ),
+        }}
+      >
+        {({ navigation }) => (
+          <AdminCompanyListScreen
+            onBack={() => navigation.navigate('AdminDashboardTab')}
+            onNavigateDetail={(id: string) => navigation.navigate('AdminCompanyDetail', { companyId: id })}
+          />
+        )}
+      </AdminTab.Screen>
+      <AdminTab.Screen
+        name="AdminUsersTab"
+        options={{
+          tabBarLabel: 'Kullanıcılar',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="people" size={size} color={color} />
+          ),
+        }}
+      >
+        {({ navigation }) => (
+          <AdminUserManagementScreen
+            onBack={() => navigation.navigate('AdminDashboardTab')}
+          />
+        )}
+      </AdminTab.Screen>
+      <AdminTab.Screen
+        name="AdminSubscriptionsTab"
+        options={{
+          tabBarLabel: 'Abonelikler',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="card" size={size} color={color} />
+          ),
+        }}
+      >
+        {({ navigation }) => (
+          <AdminSubscriptionScreen
+            onBack={() => navigation.navigate('AdminDashboardTab')}
+            onNavigateCompanyDetail={(id: string) => navigation.navigate('AdminCompanyDetail', { companyId: id })}
+          />
+        )}
+      </AdminTab.Screen>
+      <AdminTab.Screen
+        name="AdminReportsTab"
+        options={{
+          tabBarLabel: 'Raporlar',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="bar-chart" size={size} color={color} />
+          ),
+        }}
+      >
+        {({ navigation }) => (
+          <AdminReportsScreen
+            onBack={() => navigation.navigate('AdminDashboardTab')}
+          />
+        )}
+      </AdminTab.Screen>
+    </AdminTab.Navigator>
+  );
+}
+
+// ─── Super Admin Stack Navigator ───────────────────────
+function SuperAdminNavigator() {
+  return (
+    <AdminStack.Navigator screenOptions={{ headerShown: false }}>
+      <AdminStack.Screen name="SuperAdminTabs" component={SuperAdminTabs} />
+      <AdminStack.Screen name="AdminCompanyDetail">
+        {({ navigation, route }) => (
+          <AdminCompanyDetailScreen
+            companyId={(route.params as any)?.companyId}
+            onBack={() => navigation.goBack()}
+          />
+        )}
+      </AdminStack.Screen>
+      <AdminStack.Screen name="CompanyCalendar">
+        {({ navigation }) => (
+          <CompanyCalendarScreen onBack={() => navigation.goBack()} />
+        )}
+      </AdminStack.Screen>
+    </AdminStack.Navigator>
   );
 }
 
 // ─── Root Navigator ────────────────────────────────────
 export function Navigation() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const { colors, isDark } = useTheme();
+  const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
 
-  if (loading) {
+  useEffect(() => {
+    AsyncStorage.getItem('hasSeenOnboarding').then(value => {
+      setIsFirstLaunch(value === null);
+    });
+  }, []);
+
+  if (loading || isFirstLaunch === null) {
     return <LoadingSpinner message="Yükleniyor..." />;
   }
 
@@ -491,9 +653,15 @@ export function Navigation() {
       },
     };
 
+  const isSuperAdmin = user && profile?.role === 'superadmin';
+
   return (
     <NavigationContainer theme={navTheme}>
-      {user ? <MainNavigator /> : <AuthNavigator />}
+      {isFirstLaunch && !user ? (
+        <OnboardingScreen onFinish={() => setIsFirstLaunch(false)} />
+      ) : (
+        !user ? <AuthNavigator /> : isSuperAdmin ? <SuperAdminNavigator /> : <MainNavigator />
+      )}
     </NavigationContainer>
   );
 }
