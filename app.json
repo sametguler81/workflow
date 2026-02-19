@@ -41,14 +41,6 @@
         {
           "cameraPermission": "Yoklama QR kodunu taramak için kamera erişimi gereklidir."
         }
-      ],
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "useFrameworks": "static"
-          }
-        }
       ]
     ]
   }
