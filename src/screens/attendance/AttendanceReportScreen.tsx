@@ -34,8 +34,9 @@ export function AttendanceReportScreen({ onBack }: AttendanceReportScreenProps) 
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [records, setRecords] = useState<AttendanceRecord[]>([]);
     const [totalMembers, setTotalMembers] = useState(0);
-    const [absentMembers, setAbsentMembers] = useState<{ name: string; isLeave: boolean; uid: string }[]>([]);
+    const [absentMembers, setAbsentMembers] = useState<{ name: string; isLeave: boolean; uid: string; photoURL?: string }[]>([]);
     const [dailyLeaves, setDailyLeaves] = useState<LeaveRequest[]>([]);
+    const [memberMap, setMemberMap] = useState<Record<string, any>>({});
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -70,9 +71,16 @@ export function AttendanceReportScreen({ onBack }: AttendanceReportScreenProps) 
                 getCompanyLeaves(profile.companyId, 100, null, { status: 'approved' })
             ]);
 
+            // Filter members: only 'personel' and 'muhasebe' are subject to attendance
+            const targetMembers = members.filter((m: any) => m.role === 'personel' || m.role === 'muhasebe');
+
             setRecords(attendance);
-            setTotalMembers(members.length);
+            setTotalMembers(targetMembers.length);
             setDailyLeaves(leavesResult.data);
+
+            const map: Record<string, any> = {};
+            members.forEach((m: any) => map[m.uid] = m);
+            setMemberMap(map);
 
             // Find absent members
             const presentIds = new Set(attendance.map((a: AttendanceRecord) => a.userId));
@@ -81,7 +89,7 @@ export function AttendanceReportScreen({ onBack }: AttendanceReportScreenProps) 
             const targetDate = new Date(selectedDate);
             targetDate.setHours(0, 0, 0, 0);
 
-            const absentList = members
+            const absentList = targetMembers
                 .filter((m: any) => !presentIds.has(m.uid))
                 .map((m: any) => {
                     const isOnLeave = leavesResult.data.some((l: LeaveRequest) => {
@@ -96,7 +104,8 @@ export function AttendanceReportScreen({ onBack }: AttendanceReportScreenProps) 
                     return {
                         name: m.displayName || m.email,
                         uid: m.uid,
-                        isLeave: isOnLeave
+                        isLeave: isOnLeave,
+                        photoURL: m.photoURL
                     };
                 });
 
@@ -267,7 +276,12 @@ export function AttendanceReportScreen({ onBack }: AttendanceReportScreenProps) 
                             key={record.id}
                             style={[styles.recordItem, { backgroundColor: colors.card, borderColor: colors.borderLight }]}
                         >
-                            <Avatar name={record.userName} size={40} color="#667eea" />
+                            <Avatar
+                                name={record.userName}
+                                size={40}
+                                color="#667eea"
+                                imageUrl={memberMap[record.userId]?.photoURL}
+                            />
                             <View style={styles.recordInfo}>
                                 <Text style={[styles.recordName, { color: colors.text }]}>
                                     {record.userName}
@@ -311,7 +325,12 @@ export function AttendanceReportScreen({ onBack }: AttendanceReportScreenProps) 
                                     key={index}
                                     style={[styles.recordItem, { backgroundColor: colors.card, borderColor: colors.borderLight }]}
                                 >
-                                    <Avatar name={member.name} size={40} color={member.isLeave ? Colors.warning : "#FF6B6B"} />
+                                    <Avatar
+                                        name={member.name}
+                                        size={40}
+                                        color={member.isLeave ? Colors.warning : "#FF6B6B"}
+                                        imageUrl={member.photoURL}
+                                    />
                                     <View style={styles.recordInfo}>
                                         <Text style={[styles.recordName, { color: colors.text }]}>
                                             {member.name}

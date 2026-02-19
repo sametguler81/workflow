@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { Colors, BorderRadius } from '../theme/theme';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -9,8 +9,25 @@ interface AvatarProps {
     color?: string;
 }
 
-export function Avatar({ name, size = 44, color }: AvatarProps) {
+export function Avatar({ name, size = 44, color, imageUrl }: AvatarProps & { imageUrl?: string }) {
     const { colors } = useTheme();
+
+    if (imageUrl) {
+        return (
+            <Image
+                source={{ uri: imageUrl }}
+                style={{
+                    width: size,
+                    height: size,
+                    borderRadius: size / 2,
+                    backgroundColor: colors.card,
+                    borderWidth: 1,
+                    borderColor: colors.borderLight,
+                }}
+            />
+        );
+    }
+
     const initials = name
         .split(' ')
         .map((n) => n[0])

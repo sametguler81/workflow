@@ -176,7 +176,7 @@ export function AttendanceQRScreen({ onBack, onNavigateReport }: AttendanceQRScr
                         </View>
                     ) : (
                         <View style={[styles.qrCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
-                            <Ionicons name="qr-code-outline" size={80} color={colors.textTertiary} />
+                            <Ionicons name="qr-code-outline" size={56} color={colors.textTertiary} />
                             <Text style={[styles.noQrTitle, { color: colors.text }]}>
                                 Bugün QR Kod Oluşturulmadı
                             </Text>

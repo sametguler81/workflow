@@ -129,7 +129,7 @@ export function AttendanceScanScreen({ onBack, onNavigateReport }: AttendanceSca
                     <View style={{ width: 24 }} />
                 </LinearGradient>
                 <View style={styles.permissionContainer}>
-                    <Ionicons name="camera-outline" size={80} color={colors.textTertiary} />
+                    <Ionicons name="camera-outline" size={56} color={colors.textTertiary} />
                     <Text style={[styles.permissionTitle, { color: colors.text }]}>
                         Kamera İzni Gerekli
                     </Text>
@@ -169,7 +169,7 @@ export function AttendanceScanScreen({ onBack, onNavigateReport }: AttendanceSca
                 </LinearGradient>
                 <View style={styles.checkedInContainer}>
                     <View style={styles.checkedInIcon}>
-                        <Ionicons name="checkmark-circle" size={100} color={Colors.success} />
+                        <Ionicons name="checkmark-circle" size={72} color={Colors.success} />
                     </View>
                     <Text style={[styles.checkedInTitle, { color: colors.text }]}>
                         Bugün Yoklama Verildi ✅
@@ -240,7 +240,7 @@ export function AttendanceScanScreen({ onBack, onNavigateReport }: AttendanceSca
                         >
                             <Ionicons
                                 name={resultSuccess ? 'checkmark-circle' : 'close-circle'}
-                                size={64}
+                                size={48}
                                 color={resultSuccess ? Colors.success : Colors.danger}
                             />
                             <Text style={[styles.resultTitle, { color: colors.text }]}>

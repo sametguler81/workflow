@@ -84,7 +84,7 @@ export function MuhasebeDashboard({
             >
                 <View style={styles.content}>
                     {/* Stats */}
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Finansal Özet 📉</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Finansal Özet</Text>
                     <View style={styles.statsGrid}>
                         <ModernStatCard
                             title="Bekleyen Fiş"
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     actionCard: {
         flex: 1,
         alignItems: 'center',
-        padding: Spacing.lg,
+        padding: Spacing.sm + 4,
         borderRadius: BorderRadius.xl,
         borderWidth: 1,
         ...Shadows.small,
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
         marginBottom: Spacing.sm,
     },
     actionText: {
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: '600',
         textAlign: 'center',
     },

@@ -91,7 +91,7 @@ function RecentItem({ title, subtitle, status, amount }: {
 export function ReportsScreen({ onBack }: ReportsScreenProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
-    const [activeTab, setActiveTab] = useState<TabKey>('leaves');
+    const [activeTab, setActiveTab] = useState<TabKey>(profile?.role === 'muhasebe' ? 'expenses' : 'leaves');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -165,11 +165,16 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     const formatCurrency = (n: number) => `₺${n.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`;
     const formatDate = (d: string) => new Date(d).toLocaleDateString('tr-TR');
 
-    const tabs: { key: TabKey; label: string; icon: string }[] = [
+    const allTabs: { key: TabKey; label: string; icon: string }[] = [
         { key: 'leaves', label: 'İzinler', icon: 'calendar-outline' },
         { key: 'expenses', label: 'Fişler', icon: 'receipt-outline' },
         { key: 'invoices', label: 'Belgeler', icon: 'document-text-outline' },
     ];
+
+    const tabs = allTabs.filter(t => {
+        if (profile?.role === 'muhasebe' && t.key === 'leaves') return false;
+        return true;
+    });
 
     const leaveTypeLabels: Record<string, string> = {
         yillik: 'Yıllık İzin',

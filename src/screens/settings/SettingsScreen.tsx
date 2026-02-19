@@ -18,9 +18,10 @@ interface SettingsScreenProps {
     onBack: () => void;
     onNavigateProfile: () => void;
     onNavigateCompanyManagement: () => void;
+    onNavigatePrivacyPolicy: () => void;
 }
 
-export function SettingsScreen({ onBack, onNavigateProfile, onNavigateCompanyManagement }: SettingsScreenProps) {
+export function SettingsScreen({ onBack, onNavigateProfile, onNavigateCompanyManagement, onNavigatePrivacyPolicy }: SettingsScreenProps) {
     const { profile } = useAuth();
     const { colors, isDark, mode, setMode } = useTheme();
 
@@ -104,6 +105,12 @@ export function SettingsScreen({ onBack, onNavigateProfile, onNavigateCompanyMan
                         <Text style={[styles.aboutLabel, { color: colors.textSecondary }]}>Geliştirici</Text>
                         <Text style={[styles.aboutValue, { color: colors.text }]}>WorkFlow360</Text>
                     </View>
+                    <SettingRow
+                        icon="shield-checkmark-outline"
+                        label="Gizlilik Politikası"
+                        onPress={onNavigatePrivacyPolicy}
+                        colors={colors}
+                    />
                 </View>
 
                 {/* Logout */}

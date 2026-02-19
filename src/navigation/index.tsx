@@ -44,6 +44,9 @@ import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
 import { CompanyManagementScreen } from '../screens/settings/CompanyManagementScreen';
 
+// Privacy Policy
+import { PrivacyPolicyScreen } from '../screens/settings/PrivacyPolicyScreen';
+
 // Announcements
 import { AnnouncementListScreen } from '../screens/announcement/AnnouncementListScreen';
 import { CreateAnnouncementScreen } from '../screens/announcement/CreateAnnouncementScreen';
@@ -186,6 +189,7 @@ function SettingsTabScreen({ navigation }: any) {
       onBack={() => navigation.goBack()}
       onNavigateProfile={() => navigation.navigate('Profile')}
       onNavigateCompanyManagement={() => navigation.navigate('CompanyManagement')}
+      onNavigatePrivacyPolicy={() => navigation.navigate('PrivacyPolicy')}
     />
   );
 }
@@ -315,7 +319,7 @@ function MainTabs() {
         options={{
           tabBarIcon: ({ color }) => {
             const isAdmin = profile?.role === 'idari' || profile?.role === 'admin';
-            return <Ionicons name={isAdmin ? "qr-code-outline" : "scan-outline"} size={32} color="#FFF" />;
+            return <Ionicons name={isAdmin ? "qr-code-outline" : "scan-outline"} size={28} color="#FFF" />;
           },
           tabBarButton: (props) => <CustomTabBarButton {...props} />,
           tabBarLabel: () => null, // No label
@@ -411,7 +415,13 @@ function MainNavigator() {
             onBack={() => navigation.goBack()}
             onNavigateProfile={() => navigation.navigate('Profile')}
             onNavigateCompanyManagement={() => navigation.navigate('CompanyManagement')}
+            onNavigatePrivacyPolicy={() => navigation.navigate('PrivacyPolicy')}
           />
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="PrivacyPolicy">
+        {({ navigation }) => (
+          <PrivacyPolicyScreen onBack={() => navigation.goBack()} />
         )}
       </Stack.Screen>
       <Stack.Screen name="Reports">

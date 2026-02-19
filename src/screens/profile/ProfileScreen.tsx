@@ -13,6 +13,9 @@ import { useTheme } from '../../theme/ThemeContext';
 import { Avatar } from '../../components/Avatar';
 import { GradientCard } from '../../components/GradientCard';
 import { Colors, Spacing, BorderRadius, Shadows } from '../../theme/theme';
+import * as ImagePicker from 'expo-image-picker';
+import { updateUserProfile } from '../../services/authService';
+import { Alert, ActivityIndicator } from 'react-native';
 
 const roleLabels: Record<string, string> = {
     admin: 'Yönetici',
@@ -35,6 +38,40 @@ interface ProfileScreenProps {
 export function ProfileScreen({ onBack }: ProfileScreenProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
+    const [uploading, setUploading] = React.useState(false);
+
+    const handlePickImage = async () => {
+        try {
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (permission.status !== 'granted') {
+                Alert.alert('İzin Gerekli', 'Galeri erişimi gereklidir.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.4,
+                base64: true,
+            });
+
+            if (!result.canceled && result.assets[0].base64) {
+                if (!profile) return;
+                setUploading(true);
+
+                const base64Img = `data:image/jpeg;base64,${result.assets[0].base64}`;
+
+                await updateUserProfile(profile.uid, { photoURL: base64Img });
+                Alert.alert('Başarılı', 'Profil fotoğrafı güncellendi! (Uygulamayı yeniden başlattığınızda her yerde görünecektir)');
+            }
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Hata', 'Fotoğraf yüklenemedi.');
+        } finally {
+            setUploading(false);
+        }
+    };
 
     if (!profile) return null;
 
@@ -51,7 +88,26 @@ export function ProfileScreen({ onBack }: ProfileScreenProps) {
                     <TouchableOpacity onPress={onBack} style={styles.backBtn}>
                         <Ionicons name="arrow-back" size={24} color="#FFF" />
                     </TouchableOpacity>
-                    <Avatar name={profile.displayName} size={80} color="rgba(255,255,255,0.25)" />
+
+                    <View style={styles.avatarContainer}>
+                        <Avatar
+                            name={profile.displayName}
+                            size={80}
+                            color="rgba(255,255,255,0.25)"
+                            imageUrl={profile.photoURL}
+                        />
+                        <TouchableOpacity
+                            style={styles.editBadge}
+                            onPress={handlePickImage}
+                            disabled={uploading}
+                        >
+                            {uploading ? (
+                                <ActivityIndicator size="small" color="#FFF" />
+                            ) : (
+                                <Ionicons name="camera" size={16} color="#FFF" />
+                            )}
+                        </TouchableOpacity>
+                    </View>
                     <Text style={styles.name}>{profile.displayName}</Text>
                     <Text style={styles.email}>{profile.email}</Text>
                     <View style={[styles.roleBadge, { backgroundColor: roleColors[profile.role] + '30' }]}>
@@ -131,6 +187,22 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.2)',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    avatarContainer: {
+        position: 'relative',
+    },
+    editBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        backgroundColor: Colors.accent,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#1e293b', // Match header bg roughly
     },
     name: { fontSize: 24, fontWeight: '800', color: '#FFF', marginTop: 16 },
     email: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginTop: 4 },

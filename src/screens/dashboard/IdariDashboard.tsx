@@ -18,7 +18,7 @@ import { Colors, Spacing, BorderRadius, Shadows } from '../../theme/theme';
 import { getCompanyLeaves, LeaveRequest } from '../../services/leaveService';
 import { getCompanyExpenses, Expense } from '../../services/expenseService';
 import { getCompanyMembers } from '../../services/companyService';
-import { getTodayAttendanceCount } from '../../services/attendanceService';
+import { getAttendanceByDate } from '../../services/attendanceService';
 import { getUnreadCount } from '../../services/announcementService';
 
 interface IdariDashboardProps {
@@ -54,22 +54,47 @@ export function IdariDashboard({
     const loadData = useCallback(async () => {
         if (!profile) return;
         try {
-            const [lRes, eRes, members, attCount, unread] = await Promise.all([
+            // Use local date string construction to match attendanceService
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${y}-${m}-${d}`;
+
+            const [lRes, eRes, members, todayAttendance, unread] = await Promise.all([
                 getCompanyLeaves(profile.companyId),
                 getCompanyExpenses(profile.companyId),
                 getCompanyMembers(profile.companyId),
-                getTodayAttendanceCount(profile.companyId),
+                getAttendanceByDate(profile.companyId, todayStr),
                 getUnreadCount(profile.companyId, profile.uid),
             ]);
+
+            // Filter members: only 'personel' and 'muhasebe' are subject to attendance
+            const targetMembers = members.filter((m: any) => m.role === 'personel' || m.role === 'muhasebe');
+
+            // Filter attendance: count only if the user is in targetMembers
+            const targetMemberIds = new Set(targetMembers.map((m: any) => m.uid));
+            const validAttendanceCount = todayAttendance.filter((a: any) => targetMemberIds.has(a.userId)).length;
+
             setLeaves(lRes.data);
             setExpenses(eRes.data);
-            setMemberCount(members.length);
-            setAttendanceCount(attCount);
+            setMemberCount(targetMembers.length);
+            setAttendanceCount(validAttendanceCount);
             setUnreadCount(unread);
+
+            // Populate member map for avatars
+            const map: Record<string, any> = {};
+            members.forEach((m: any) => map[m.uid] = m);
+            setMemberMap(map);
         } catch (err) {
             console.error(err);
         }
     }, [profile]);
+
+    // Create a map for quick member lookup
+    const [memberMap, setMemberMap] = useState<Record<string, any>>({});
+
+    // Member map is now handled in loadData to reduce reads
 
     useEffect(() => { loadData(); }, [loadData]);
 
@@ -194,7 +219,11 @@ export function IdariDashboard({
                             activeOpacity={0.7}
                         >
                             <View style={styles.listItemIcon}>
-                                <Avatar name={leave.userName} size={36} />
+                                <Avatar
+                                    name={leave.userName}
+                                    size={36}
+                                    imageUrl={memberMap[leave.userId]?.photoURL}
+                                />
                             </View>
                             <View style={styles.listItemContent}>
                                 <Text style={[styles.listItemTitle, { color: colors.text }]}>
@@ -244,7 +273,7 @@ const styles = StyleSheet.create({
     actionCard: {
         flex: 1,
         alignItems: 'center',
-        padding: Spacing.lg,
+        padding: Spacing.sm + 4,
         borderRadius: BorderRadius.xl,
         borderWidth: 1,
         ...Shadows.small,
@@ -258,7 +287,7 @@ const styles = StyleSheet.create({
         marginBottom: Spacing.sm,
     },
     actionText: {
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: '600',
         textAlign: 'center',
     },

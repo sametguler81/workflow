@@ -7,7 +7,7 @@ import {
     onAuthStateChanged,
     FirebaseAuthTypes,
 } from '@react-native-firebase/auth';
-import { getFirestore, doc, setDoc, getDoc } from '@react-native-firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, updateDoc } from '@react-native-firebase/firestore';
 
 export type User = FirebaseAuthTypes.User;
 
@@ -18,6 +18,7 @@ export interface UserProfile {
     role: 'personel' | 'idari' | 'muhasebe' | 'admin' | 'superadmin';
     companyId: string;
     companyName?: string;
+    photoURL?: string;
     createdAt: string;
 }
 
@@ -63,6 +64,10 @@ export async function registerUser(
 
     await setDoc(doc(db, 'users', cred.user.uid), profile);
     return profile;
+}
+
+export async function updateUserProfile(uid: string, data: Partial<UserProfile>): Promise<void> {
+    await updateDoc(doc(db, 'users', uid), data);
 }
 
 export async function loginUser(email: string, password: string): Promise<User> {
