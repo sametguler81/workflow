@@ -6,7 +6,7 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "scheme": "workflow",
     "ios": {
       "supportsTablet": true,
@@ -40,14 +40,6 @@
         "expo-camera",
         {
           "cameraPermission": "Yoklama QR kodunu taramak için kamera erişimi gereklidir."
-        }
-      ],
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "useFrameworks": "static"
-          }
         }
       ],
       [
