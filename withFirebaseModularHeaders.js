@@ -24,10 +24,10 @@ pod 'GoogleUtilities', :modular_headers => true
 pod 'RecaptchaInterop', :modular_headers => true
 pod 'FirebaseFirestoreInternal', :modular_headers => true
 `;
-                    // Inject inside target 'main' do
+                    // Inject before use_react_native!
                     contents = contents.replace(
-                        /target 'main' do/g,
-                        `target 'main' do\n${customBlock}`
+                        /use_react_native!/g,
+                        `${customBlock}\n  use_react_native!`
                     );
                 }
 
