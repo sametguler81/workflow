@@ -10,21 +10,25 @@ const withFirebaseModularHeaders = (config) => {
             if (fs.existsSync(filePath)) {
                 let contents = fs.readFileSync(filePath, 'utf-8');
 
-                if (!contents.includes('# EXPO_FIREBASE_MODULAR_HEADERS')) {
+                // Always remove old attempts first
+                contents = contents.replace(/# EXPO_FIREBASE_MODULAR_HEADERS[\s\S]*?use_modular_headers!/g, '');
+                contents = contents.replace(/> :static[\s\n]*use_modular_headers!/g, '');
+                contents = contents.replace(/# GRPC_MODULEMAP_FIX[\s\S]*?end\n    end/g, '');
+
+                if (!contents.includes('# EXPO_SPECIFIC_MODULAR_HEADERS')) {
                     const customBlock = `
-# EXPO_FIREBASE_MODULAR_HEADERS
-$RNFirebaseAsStaticFramework = true
-use_frameworks! :linkage => :static
-use_modular_headers!
+# EXPO_SPECIFIC_MODULAR_HEADERS
+pod 'FirebaseAuthInterop', :modular_headers => true
+pod 'FirebaseAppCheckInterop', :modular_headers => true
+pod 'GoogleUtilities', :modular_headers => true
+pod 'RecaptchaInterop', :modular_headers => true
+pod 'FirebaseFirestoreInternal', :modular_headers => true
 `;
+                    // Inject inside target 'main' do
                     contents = contents.replace(
                         /target 'main' do/g,
                         `target 'main' do\n${customBlock}`
                     );
-
-                    if (!contents.includes('# EXPO_FIREBASE_MODULAR_HEADERS')) {
-                        contents = customBlock + contents;
-                    }
                 }
 
                 fs.writeFileSync(filePath, contents);
