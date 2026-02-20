@@ -41,14 +41,6 @@
           }
         }
       ],
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "useFrameworks": false
-          }
-        }
-      ],
       "@react-native-firebase/auth",
       "@react-native-community/datetimepicker",
       [
