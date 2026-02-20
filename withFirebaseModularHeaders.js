@@ -10,21 +10,18 @@ const withFirebaseModularHeaders = (config) => {
             if (fs.existsSync(filePath)) {
                 let contents = fs.readFileSync(filePath, 'utf-8');
 
-                // Always remove old attempts first
-                contents = contents.replace(/# EXPO_FIREBASE_MODULAR_HEADERS[\s\S]*?use_modular_headers!/g, '');
-                contents = contents.replace(/> :static[\s\n]*use_modular_headers!/g, '');
-                contents = contents.replace(/# GRPC_MODULEMAP_FIX[\s\S]*?end\n    end/g, '');
+                contents = contents.replace(/# EXPO_SPECIFIC_MODULAR_HEADERS[\s\S]*?FirebaseFirestoreInternal', :modular_headers => true/g, '');
 
-                if (!contents.includes('# EXPO_SPECIFIC_MODULAR_HEADERS')) {
+                if (!contents.includes('# EXPO_FIREBASE_STATIC_FIX')) {
                     const customBlock = `
-# EXPO_SPECIFIC_MODULAR_HEADERS
+# EXPO_FIREBASE_STATIC_FIX
+$RNFirebaseAsStaticFramework = true
 pod 'FirebaseAuthInterop', :modular_headers => true
 pod 'FirebaseAppCheckInterop', :modular_headers => true
 pod 'GoogleUtilities', :modular_headers => true
 pod 'RecaptchaInterop', :modular_headers => true
 pod 'FirebaseFirestoreInternal', :modular_headers => true
 `;
-                    // Inject before use_react_native!
                     contents = contents.replace(
                         /use_react_native!/g,
                         `${customBlock}\n  use_react_native!`
