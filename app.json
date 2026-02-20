@@ -41,6 +41,7 @@
           }
         }
       ],
+      "./withFirebaseModularHeaders.js",
       "@react-native-firebase/auth",
       "@react-native-community/datetimepicker",
       [
