@@ -41,13 +41,21 @@
           }
         }
       ],
-      "./withFirebaseModularHeaders.js",
       "@react-native-firebase/auth",
       "@react-native-community/datetimepicker",
       [
         "expo-camera",
         {
           "cameraPermission": "Yoklama QR kodunu taramak için kamera erişimi gereklidir."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "14.0",
+            "useFrameworks": "static"
+          }
         }
       ]
     ]
