@@ -33,14 +33,7 @@
           "image": "./assets/splash-icon.png"
         }
       ],
-      [
-        "@react-native-firebase/app",
-        {
-          "ios": {
-            "modular_headers": true
-          }
-        }
-      ],
+      "@react-native-firebase/app",
       "@react-native-firebase/auth",
       "@react-native-community/datetimepicker",
       [
