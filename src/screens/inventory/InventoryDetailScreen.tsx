@@ -276,15 +276,15 @@ export function InventoryDetailScreen({ itemId, onBack }: InventoryDetailScreenP
                                     idx > 0 && { borderTopWidth: 1, borderTopColor: colors.borderLight }
                                 ]}
                             >
-                                <View style={{ flex: 1 }}>
-                                    <Text style={[styles.assignmentName, { color: colors.text }]}>
+                                <View style={{ flex: 1, paddingRight: Spacing.md }}>
+                                    <Text style={[styles.assignmentName, { color: colors.text }]} numberOfLines={1}>
                                         {ass.assignedToName}
                                     </Text>
                                     <Text style={[styles.assignmentDate, { color: colors.textSecondary }]}>
                                         {formatDate(ass.assignedAt)}
                                     </Text>
                                     {ass.notes ? (
-                                        <Text style={[styles.assignmentNote, { color: colors.textSecondary }]}>
+                                        <Text style={[styles.assignmentNote, { color: colors.textSecondary }]} numberOfLines={2}>
                                             Not: {ass.notes}
                                         </Text>
                                     ) : null}
@@ -295,8 +295,10 @@ export function InventoryDetailScreen({ itemId, onBack }: InventoryDetailScreenP
                                         setAssignmentToReturn(ass);
                                         setReturnModalVisible(true);
                                     }}
+                                    activeOpacity={0.8}
                                 >
-                                    <Text style={styles.returnMiniText}>İade Al</Text>
+                                    <Ionicons name="return-down-back-outline" size={14} color="#FFF" style={{ marginRight: 4 }} />
+                                    <Text style={styles.returnMiniText}>İade</Text>
                                 </TouchableOpacity>
                             </View>
                         ))}
@@ -545,8 +547,8 @@ const styles = StyleSheet.create({
     assignmentName: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
     assignmentDate: { fontSize: 12 },
     assignmentNote: { fontSize: 12, marginTop: 4, fontStyle: 'italic' },
-    returnMiniBtn: { backgroundColor: Colors.success, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-    returnMiniText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
+    returnMiniBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.success, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+    returnMiniText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
     actionRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.xl },
     actionBtn: {
         flex: 1,
