@@ -72,7 +72,7 @@ export async function getCompanyAnnouncements(
                     a.targetRoles.includes('all') ||
                     a.targetRoles.includes(userRole)
                 )) ||
-                a.createdBy === userId
+                (a.type !== 'notification' && a.createdBy === userId)
             )
     );
 }
