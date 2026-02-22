@@ -52,9 +52,7 @@ export async function createExpense(
 ): Promise<string> {
     const cleanedData: any = {};
     Object.entries(data).forEach(([key, value]) => {
-        if (value === undefined) {
-            cleanedData[key] = deleteField();
-        } else {
+        if (value !== undefined) {
             cleanedData[key] = value;
         }
     });
