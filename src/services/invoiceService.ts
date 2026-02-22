@@ -15,6 +15,8 @@ import {
     FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 
+import { createAnnouncement } from './announcementService';
+
 const db = getFirestore();
 
 export type DocumentType = 'fatura' | 'makbuz' | 'sozlesme' | 'diger';
@@ -75,6 +77,26 @@ export async function createInvoice(
         status: 'pending',
         createdAt: new Date().toISOString(),
     });
+
+    // Trigger Notification for Muhasebe & Admin
+    try {
+        await createAnnouncement({
+            companyId: data.companyId,
+            title: 'Yeni Fatura/Belge Yüklendi',
+            message: `${data.userName} yeni bir fatura/belge ekledi (${data.amount} ₺).`,
+            createdBy: data.userId,
+            createdByName: data.userName,
+            targetType: 'selected',
+            targetUserIds: [],
+            targetRoles: ['muhasebe', 'admin'],
+            type: 'notification',
+            relatedId: ref.id,
+            relatedType: 'invoice',
+        });
+    } catch (error) {
+        console.error('Failed to send invoice notification:', error);
+    }
+
     return ref.id;
 }
 
@@ -174,12 +196,42 @@ export async function updateInvoiceStatus(
     reviewedBy: string,
     reviewNote?: string
 ): Promise<void> {
-    await updateDoc(doc(db, 'invoices', invoiceId), {
+    const docRef = doc(db, 'invoices', invoiceId);
+
+    await updateDoc(docRef, {
         status,
         reviewedBy,
         reviewNote: reviewNote || '',
         updatedAt: new Date().toISOString(),
     });
+
+    // Durum değiştiğinde talep sahibine Notification gönderelim
+    try {
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            const data = snap.data() as Invoice;
+            const message = status === 'approved'
+                ? `Faturanız/Belgeniz onaylandı.`
+                : status === 'rejected'
+                    ? `Faturanız/Belgeniz reddedildi.`
+                    : `Belge durumu güncellendi.`;
+
+            await createAnnouncement({
+                companyId: data.companyId,
+                title: 'Fatura/Belge Durumu Güncellendi',
+                message,
+                createdBy: reviewedBy,
+                createdByName: 'Muhasebe/Yönetici',
+                targetType: 'selected',
+                targetUserIds: [data.userId],
+                type: 'notification',
+                relatedId: invoiceId,
+                relatedType: 'invoice',
+            });
+        }
+    } catch (err) {
+        console.error('Failed to notify invoice status update', err);
+    }
 }
 
 export async function updateInvoice(
