@@ -70,6 +70,7 @@ import { DocumentManagementScreen } from '../screens/documents/DocumentManagemen
 import { InventoryListScreen } from '../screens/inventory/InventoryListScreen';
 import { InventoryDetailScreen } from '../screens/inventory/InventoryDetailScreen';
 import { AddInventoryItemScreen } from '../screens/inventory/AddInventoryItemScreen';
+import { EditInventoryItemScreen } from '../screens/inventory/EditInventoryItemScreen';
 import { MyAssignmentsScreen } from '../screens/inventory/MyAssignmentsScreen';
 
 // Super Admin Screens
@@ -542,6 +543,7 @@ function MainNavigator() {
           <InventoryDetailScreen
             itemId={(route.params as any)?.itemId}
             onBack={() => navigation.goBack()}
+            onNavigateEdit={(id) => navigation.navigate('EditInventoryItem', { itemId: id })}
           />
         )}
       </Stack.Screen>
@@ -549,6 +551,16 @@ function MainNavigator() {
       <Stack.Screen name="AddInventory">
         {({ navigation }) => (
           <AddInventoryItemScreen
+            onBack={() => navigation.goBack()}
+            onSuccess={() => navigation.goBack()}
+          />
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="EditInventoryItem">
+        {({ navigation, route }) => (
+          <EditInventoryItemScreen
+            itemId={(route.params as any)?.itemId}
             onBack={() => navigation.goBack()}
             onSuccess={() => navigation.goBack()}
           />

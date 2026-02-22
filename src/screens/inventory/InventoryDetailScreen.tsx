@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     View,
     Text,
@@ -33,9 +34,10 @@ import { getCompanyMembers } from '../../services/companyService';
 interface InventoryDetailScreenProps {
     itemId: string;
     onBack: () => void;
+    onNavigateEdit: (id: string) => void;
 }
 
-export function InventoryDetailScreen({ itemId, onBack }: InventoryDetailScreenProps) {
+export function InventoryDetailScreen({ itemId, onBack, onNavigateEdit }: InventoryDetailScreenProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
 
@@ -75,7 +77,11 @@ export function InventoryDetailScreen({ itemId, onBack }: InventoryDetailScreenP
         }
     }, [itemId, profile]);
 
-    useEffect(() => { loadData(); }, [loadData]);
+    useFocusEffect(
+        useCallback(() => {
+            loadData();
+        }, [loadData])
+    );
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -143,7 +149,7 @@ export function InventoryDetailScreen({ itemId, onBack }: InventoryDetailScreenP
                         <Ionicons name="chevron-back" size={24} color={colors.text} />
                     </TouchableOpacity>
                     <Text style={[styles.headerTitle, { color: colors.text }]}>Detay</Text>
-                    <View style={{ width: 32 }} />
+                    <View style={{ width: 40 }} />
                 </View>
                 <View style={styles.centered}>
                     <Ionicons name="cube-outline" size={48} color={colors.textTertiary} />
@@ -163,7 +169,9 @@ export function InventoryDetailScreen({ itemId, onBack }: InventoryDetailScreenP
                 <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
                     {item.name}
                 </Text>
-                <View style={{ width: 32 }} />
+                <TouchableOpacity onPress={() => onNavigateEdit(itemId)} style={styles.backBtn} activeOpacity={0.7}>
+                    <Ionicons name="create-outline" size={24} color={Colors.primary} />
+                </TouchableOpacity>
             </View>
 
             <ScrollView
