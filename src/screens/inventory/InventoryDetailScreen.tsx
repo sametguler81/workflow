@@ -536,18 +536,32 @@ const styles = StyleSheet.create({
     detailLabel: { fontSize: 13, fontWeight: '600' },
     detailValue: { fontSize: 13, fontWeight: '500' },
     assignmentCard: {
-        padding: Spacing.lg,
+        padding: Spacing.xl,
         borderRadius: BorderRadius.xl,
         borderWidth: 1,
         marginBottom: Spacing.md,
     },
     assignmentHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm },
     assignmentTitle: { fontSize: 13, fontWeight: '700' },
-    assignmentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.sm, gap: Spacing.md },
-    assignmentName: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
-    assignmentDate: { fontSize: 12 },
-    assignmentNote: { fontSize: 12, marginTop: 4, fontStyle: 'italic' },
-    returnMiniBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.success, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+    assignmentRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: Spacing.md,
+        paddingHorizontal: Spacing.md,
+        gap: Spacing.lg
+    },
+    assignmentName: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+    assignmentDate: { fontSize: 13 },
+    assignmentNote: { fontSize: 13, marginTop: 6, fontStyle: 'italic', lineHeight: 18 },
+    returnMiniBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.success,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 10
+    },
     returnMiniText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
     actionRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.xl },
     actionBtn: {
