@@ -10,6 +10,7 @@ import {
     addDoc,
     orderBy,
     deleteDoc,
+    deleteField,
 } from '@react-native-firebase/firestore';
 
 const db = getFirestore();
@@ -161,8 +162,17 @@ export async function updateInventoryItem(
     itemId: string,
     data: Partial<Omit<InventoryItem, 'id' | 'companyId' | 'createdAt' | 'createdBy'>>
 ): Promise<void> {
+    const cleanedData: any = {};
+    Object.entries(data).forEach(([key, value]) => {
+        if (value === undefined) {
+            cleanedData[key] = deleteField();
+        } else {
+            cleanedData[key] = value;
+        }
+    });
+
     await updateDoc(doc(db, 'inventoryItems', itemId), {
-        ...data,
+        ...cleanedData,
         updatedAt: new Date().toISOString(),
     });
 }
