@@ -63,7 +63,7 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
         }
     }, [expenseToEdit]);
 
-    const handlePickFile = async (source: 'camera' | 'document') => {
+    const handlePickFile = async (source: 'camera' | 'gallery' | 'document') => {
         try {
             if (source === 'camera') {
                 const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -83,6 +83,24 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
                     setFileName(`camera_${Date.now()}.jpg`);
                     setFileType('image');
                 }
+            } else if (source === 'gallery') {
+                const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                if (permission.status !== 'granted') {
+                    Alert.alert('İzin Gerekli', 'Galeri erişim izni gereklidir.');
+                    return;
+                }
+
+                const result = await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ['images'],
+                    quality: 0.5,
+                    allowsEditing: false,
+                });
+
+                if (!result.canceled && result.assets && result.assets.length > 0) {
+                    setImageUri(result.assets[0].uri);
+                    setFileName(`gallery_${Date.now()}.jpg`);
+                    setFileType('image');
+                }
             } else {
                 // Document Picker
                 const result = await DocumentPicker.getDocumentAsync({
@@ -100,7 +118,7 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
         } catch (err: any) {
             console.error('File pick error:', err);
             if (err.message && err.message.includes('Camera not available on simulator')) {
-                Alert.alert('Uyarı', 'Kamera simülatörde kullanılamaz. Lütfen test için "Belge" seçeneğini kullanın.');
+                Alert.alert('Uyarı', 'Kamera simülatörde kullanılamaz. Lütfen test için "Galeri" veya "Belge" seçeneğini kullanın.');
             } else {
                 Alert.alert('Hata', 'Dosya seçilemedi.');
             }
@@ -263,26 +281,36 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
                         ) : (
                             <View style={styles.pickerRow}>
                                 <TouchableOpacity
-                                    style={[styles.pickerCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}
+                                    style={[styles.pickerCard, { backgroundColor: colors.card, borderColor: colors.borderLight, padding: Spacing.md }]}
                                     onPress={() => handlePickFile('camera')}
                                     activeOpacity={0.7}
                                 >
-                                    <View style={[styles.pickerIcon, { backgroundColor: Colors.primary + '15' }]}>
-                                        <Ionicons name="camera" size={28} color={Colors.primary} />
+                                    <View style={[styles.pickerIcon, { backgroundColor: Colors.primary + '15', width: 48, height: 48, borderRadius: 16 }]}>
+                                        <Ionicons name="camera" size={24} color={Colors.primary} />
                                     </View>
-                                    <Text style={[styles.pickerLabel, { color: colors.text }]}>Kamera</Text>
-                                    <Text style={[styles.pickerSub, { color: colors.textTertiary }]}>Fotoğraf çek</Text>
+                                    <Text style={[styles.pickerLabel, { color: colors.text, fontSize: 13 }]}>Kamera</Text>
                                 </TouchableOpacity>
 
                                 <TouchableOpacity
-                                    style={[styles.pickerCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}
+                                    style={[styles.pickerCard, { backgroundColor: colors.card, borderColor: colors.borderLight, padding: Spacing.md }]}
+                                    onPress={() => handlePickFile('gallery')}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={[styles.pickerIcon, { backgroundColor: Colors.info + '15', width: 48, height: 48, borderRadius: 16 }]}>
+                                        <Ionicons name="images" size={24} color={Colors.info} />
+                                    </View>
+                                    <Text style={[styles.pickerLabel, { color: colors.text, fontSize: 13 }]}>Galeri</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[styles.pickerCard, { backgroundColor: colors.card, borderColor: colors.borderLight, padding: Spacing.md }]}
                                     onPress={() => handlePickFile('document')}
                                     activeOpacity={0.7}
                                 >
-                                    <View style={[styles.pickerIcon, { backgroundColor: Colors.accent + '15' }]}>
-                                        <Ionicons name="document-text" size={28} color={Colors.accent} />
+                                    <View style={[styles.pickerIcon, { backgroundColor: Colors.accent + '15', width: 48, height: 48, borderRadius: 16 }]}>
+                                        <Ionicons name="document-text" size={24} color={Colors.accent} />
                                     </View>
-                                    <Text style={[styles.pickerLabel, { color: colors.text }]}>Belge</Text>
+                                    <Text style={[styles.pickerLabel, { color: colors.text, fontSize: 13 }]}>Belge</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
