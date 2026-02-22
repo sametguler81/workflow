@@ -78,7 +78,7 @@ export function IdariDashboard({
                 getCompanyExpenses(profile.companyId, 100),
                 getCompanyMembers(profile.companyId),
                 getAttendanceByDate(profile.companyId, todayStr),
-                getUnreadCount(profile.companyId, profile.uid),
+                getUnreadCount(profile.companyId, profile.uid, profile.role),
             ]);
 
             // Calculate Receivables (Company owes me)

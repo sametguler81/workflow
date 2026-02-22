@@ -47,7 +47,7 @@ export function MuhasebeDashboard({
         try {
             const [res, unread] = await Promise.all([
                 getCompanyExpenses(profile.companyId),
-                getUnreadCount(profile.companyId, profile.uid),
+                getUnreadCount(profile.companyId, profile.uid, profile.role),
             ]);
             setExpenses(res.data);
             setUnreadCount(unread);

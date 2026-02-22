@@ -58,7 +58,7 @@ export function PersonelDashboard({
                 getUserLeaves(profile.uid, profile.companyId),
                 getUserExpenses(profile.uid, profile.companyId),
                 hasCheckedInToday(profile.uid, profile.companyId),
-                getUnreadCount(profile.companyId, profile.uid),
+                getUnreadCount(profile.companyId, profile.uid, profile.role),
             ]);
             setLeaves(lRes.data);
             setExpenses(eRes.data);
