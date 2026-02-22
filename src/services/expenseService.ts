@@ -13,6 +13,7 @@ import {
     startAfter,
     deleteDoc,
     FirebaseFirestoreTypes,
+    deleteField,
 } from '@react-native-firebase/firestore';
 
 const db = getFirestore();
@@ -49,8 +50,17 @@ export interface ExpenseFilter {
 export async function createExpense(
     data: Omit<Expense, 'id' | 'status' | 'createdAt'>
 ): Promise<string> {
+    const cleanedData: any = {};
+    Object.entries(data).forEach(([key, value]) => {
+        if (value === undefined) {
+            cleanedData[key] = deleteField();
+        } else {
+            cleanedData[key] = value;
+        }
+    });
+
     const ref = await addDoc(collection(db, 'expenses'), {
-        ...data,
+        ...cleanedData,
         status: 'pending',
         createdAt: new Date().toISOString(),
     });
