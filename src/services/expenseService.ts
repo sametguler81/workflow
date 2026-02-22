@@ -16,6 +16,8 @@ import {
     deleteField,
 } from '@react-native-firebase/firestore';
 
+import { createAnnouncement } from './announcementService';
+
 const db = getFirestore();
 
 export type ExpenseStatus = 'pending' | 'approved' | 'rejected';
@@ -62,6 +64,25 @@ export async function createExpense(
         status: 'pending',
         createdAt: new Date().toISOString(),
     });
+    // Trigger Notification for Muhasebe & Admin
+    try {
+        await createAnnouncement({
+            companyId: data.companyId,
+            title: 'Yeni Fiş/Masraf Talebi',
+            message: `${data.userName} yeni bir fiş yükledi (${data.amount} ₺).`,
+            createdBy: data.userId,
+            createdByName: data.userName,
+            targetType: 'selected', // Role-based
+            targetUserIds: [],
+            targetRoles: ['muhasebe', 'admin'],
+            type: 'notification',
+            relatedId: ref.id,
+            relatedType: 'expense',
+        });
+    } catch (error) {
+        console.error('Failed to send expense notification:', error);
+    }
+
     return ref.id;
 }
 
@@ -154,12 +175,42 @@ export async function updateExpenseStatus(
     reviewedBy: string,
     reviewNote?: string
 ): Promise<void> {
-    await updateDoc(doc(db, 'expenses', expenseId), {
+    const docRef = doc(db, 'expenses', expenseId);
+
+    await updateDoc(docRef, {
         status,
         reviewedBy,
         reviewNote: reviewNote || '',
         updatedAt: new Date().toISOString(),
     });
+
+    // Durum değiştiğinde talep sahibine Notification gönderelim
+    try {
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            const data = snap.data() as Expense;
+            const message = status === 'approved'
+                ? `Fişiniz/Masrafınız onaylandı.`
+                : status === 'rejected'
+                    ? `Fişiniz/Masrafınız reddedildi.`
+                    : `Fiş durumu güncellendi.`;
+
+            await createAnnouncement({
+                companyId: data.companyId,
+                title: 'Fiş/Masraf Durumu Güncellendi',
+                message,
+                createdBy: reviewedBy,
+                createdByName: 'Muhasebe/Yönetici',
+                targetType: 'selected',
+                targetUserIds: [data.userId],
+                type: 'notification',
+                relatedId: expenseId,
+                relatedType: 'expense',
+            });
+        }
+    } catch (err) {
+        console.error('Failed to notify expense status update', err);
+    }
 }
 
 export async function updateExpense(

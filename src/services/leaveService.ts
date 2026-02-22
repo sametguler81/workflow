@@ -64,7 +64,7 @@ export async function createLeaveRequest(
             createdByName: data.userName,
             targetType: 'selected', // Role-based
             targetUserIds: [],
-            targetRole: 'idari',
+            targetRoles: ['idari', 'admin'],
             type: 'notification',
             relatedId: ref.id,
             relatedType: 'leave',
@@ -164,12 +164,42 @@ export async function updateLeaveStatus(
     reviewedBy: string,
     reviewNote?: string
 ): Promise<void> {
-    await updateDoc(doc(db, 'leaves', leaveId), {
+    const docRef = doc(db, 'leaves', leaveId);
+
+    await updateDoc(docRef, {
         status,
         reviewedBy,
         reviewNote: reviewNote || '',
         updatedAt: new Date().toISOString(),
     });
+
+    // Durum değiştiğinde talep sahibine Notification gönderelim
+    try {
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            const data = snap.data() as LeaveRequest;
+            const message = status === 'approved'
+                ? `İzin talebiniz onaylandı.`
+                : status === 'rejected'
+                    ? `İzin talebiniz reddedildi.`
+                    : `İzin talebiniz güncellendi.`;
+
+            await createAnnouncement({
+                companyId: data.companyId,
+                title: 'İzin Durumu Güncellendi',
+                message,
+                createdBy: reviewedBy,
+                createdByName: 'Sistem Yöneticisi', // Can be expanded or omitted
+                targetType: 'selected',
+                targetUserIds: [data.userId],
+                type: 'notification',
+                relatedId: leaveId,
+                relatedType: 'leave',
+            });
+        }
+    } catch (err) {
+        console.error('Failed to notify leave status update', err);
+    }
 }
 
 export async function deleteLeave(leaveId: string): Promise<void> {

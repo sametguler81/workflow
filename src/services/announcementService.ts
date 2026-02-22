@@ -24,7 +24,7 @@ export interface Announcement {
     createdByName: string;
     targetType: 'all' | 'selected';
     targetUserIds: string[];
-    targetRole?: 'all' | 'idari' | 'muhasebe' | 'personel' | 'admin'; // New: Target specific role
+    targetRoles?: string[]; // New: Target multiple roles (e.g., ['idari', 'admin'])
     type?: 'announcement' | 'notification'; // New: Distinguish system notifications
     relatedId?: string; // New: Link to leave/expense ID
     relatedType?: 'leave' | 'expense' | 'invoice'; // New: Type of related item
@@ -68,9 +68,9 @@ export async function getCompanyAnnouncements(
             (
                 a.targetType === 'all' ||
                 a.targetUserIds?.includes(userId) ||
-                (a.targetRole && userRole && (
-                    a.targetRole === 'all' ||
-                    a.targetRole === userRole // STRICT MATCH: Only see if role matches exactly (e.g. idari -> idari)
+                (a.targetRoles && userRole && (
+                    a.targetRoles.includes('all') ||
+                    a.targetRoles.includes(userRole)
                 )) ||
                 a.createdBy === userId
             )

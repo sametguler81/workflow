@@ -105,6 +105,7 @@ export function CreateAnnouncementScreen({ onBack }: CreateAnnouncementScreenPro
                 createdByName: profile.displayName || profile.email,
                 targetType: targetAll ? 'all' : 'selected',
                 targetUserIds: selectedIds,
+                targetRoles: targetAll ? ['all'] : [],
             });
             Alert.alert('Başarılı', 'Duyuru başarıyla gönderildi! 🎉', [
                 { text: 'Tamam', onPress: onBack },
