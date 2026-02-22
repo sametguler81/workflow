@@ -28,7 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>workflow</string>
-          <string>com.workflow</string>
+          <string>com.sametguler.workflow</string>
         </array>
       </dict>
       <dict>

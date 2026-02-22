@@ -10,7 +10,7 @@
     "scheme": "workflow",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.workflow",
+      "bundleIdentifier": "com.sametguler.workflow",
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
@@ -18,7 +18,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.workflow",
+      "package": "com.sametguler.workflow",
       "googleServicesFile": "./google-services.json"
     },
     "web": {

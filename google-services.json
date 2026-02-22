@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:521952446432:android:b1eab3385f646898dc0d85",
+        "android_client_info": {
+          "package_name": "com.sametguler.workflow"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB82HC09wIkZIHJghiPa-IYqHiZddBvkOE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:521952446432:android:ecb44e1427f0f00edc0d85",
         "android_client_info": {
           "package_name": "com.workflow"
