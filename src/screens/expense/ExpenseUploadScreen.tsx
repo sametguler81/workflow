@@ -97,9 +97,13 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
                     setFileType(asset.mimeType?.includes('pdf') ? 'pdf' : 'image');
                 }
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error('File pick error:', err);
-            Alert.alert('Hata', 'Dosya seçilemedi.');
+            if (err.message && err.message.includes('Camera not available on simulator')) {
+                Alert.alert('Uyarı', 'Kamera simülatörde kullanılamaz. Lütfen test için "Belge" seçeneğini kullanın.');
+            } else {
+                Alert.alert('Hata', 'Dosya seçilemedi.');
+            }
         }
     };
 
