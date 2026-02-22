@@ -28,10 +28,12 @@ interface IdariDashboardProps {
     onNavigateLeaveDetail: (leaveId: string) => void;
     onNavigateAttendanceQR?: () => void;
     onNavigateAttendanceReport?: () => void;
-    onNavigateGenericReports?: () => void; // General Reports
+    onNavigateGenericReports?: () => void;
     onNavigateAnnouncements?: () => void;
     onNavigateCompanyCalendar?: () => void;
     onNavigateDocuments?: () => void;
+    onNavigateInventory?: () => void;
+    onNavigateMyAssignments?: () => void;
 }
 
 export function IdariDashboard({
@@ -45,6 +47,8 @@ export function IdariDashboard({
     onNavigateAnnouncements,
     onNavigateCompanyCalendar,
     onNavigateDocuments,
+    onNavigateInventory,
+    onNavigateMyAssignments,
 }: IdariDashboardProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
@@ -241,6 +245,28 @@ export function IdariDashboard({
                                 <Ionicons name="calendar-outline" size={22} color="#EC4899" />
                             </View>
                             <Text style={[styles.actionText, { color: colors.text }]}>Takvim</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                            onPress={onNavigateInventory}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#0EA5E9' + '10' }]}>
+                                <Ionicons name="cube-outline" size={22} color="#0EA5E9" />
+                            </View>
+                            <Text style={[styles.actionText, { color: colors.text }]}>Envanter</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                            onPress={onNavigateMyAssignments}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#10B981' + '10' }]}>
+                                <Ionicons name="pricetag-outline" size={22} color="#10B981" />
+                            </View>
+                            <Text style={[styles.actionText, { color: colors.text }]}>Zimmetlerim</Text>
                         </TouchableOpacity>
                     </ScrollView>
 

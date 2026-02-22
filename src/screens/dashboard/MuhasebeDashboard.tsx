@@ -24,6 +24,7 @@ interface MuhasebeDashboardProps {
     onNavigateAnnouncements?: () => void;
     onNavigateFinance?: () => void;
     onNavigateDocuments?: () => void;
+    onNavigateMyAssignments?: () => void;
 }
 
 export function MuhasebeDashboard({
@@ -33,6 +34,7 @@ export function MuhasebeDashboard({
     onNavigateAnnouncements,
     onNavigateFinance,
     onNavigateDocuments,
+    onNavigateMyAssignments,
 }: MuhasebeDashboardProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
@@ -186,6 +188,17 @@ export function MuhasebeDashboard({
                                 <Ionicons name="folder-open-outline" size={22} color="#8B5CF6" />
                             </View>
                             <Text style={[styles.actionText, { color: colors.text }]}>Belgeler</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                            onPress={onNavigateMyAssignments}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#10B981' + '10' }]}>
+                                <Ionicons name="pricetag-outline" size={22} color="#10B981" />
+                            </View>
+                            <Text style={[styles.actionText, { color: colors.text }]}>Zimmetlerim</Text>
                         </TouchableOpacity>
 
                         {/* Add more scrollable items here if needed later */}

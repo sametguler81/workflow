@@ -66,6 +66,12 @@ import { ReportsScreen } from '../screens/reports/ReportsScreen';
 // Documents
 import { DocumentManagementScreen } from '../screens/documents/DocumentManagementScreen';
 
+// Inventory
+import { InventoryListScreen } from '../screens/inventory/InventoryListScreen';
+import { InventoryDetailScreen } from '../screens/inventory/InventoryDetailScreen';
+import { AddInventoryItemScreen } from '../screens/inventory/AddInventoryItemScreen';
+import { MyAssignmentsScreen } from '../screens/inventory/MyAssignmentsScreen';
+
 // Super Admin Screens
 import { SuperAdminDashboard } from '../screens/superadmin/SuperAdminDashboard';
 import { AdminCompanyListScreen } from '../screens/superadmin/AdminCompanyListScreen';
@@ -113,7 +119,7 @@ function DashboardScreen({ navigation }: any) {
 
   const navigateLeaveList = () => navigation.navigate('LeaveList');
   const navigateExpenseList = () => navigation.navigate('ExpenseList');
-  const navigateFinance = () => navigation.navigate('Finance'); // New
+  const navigateFinance = () => navigation.navigate('Finance');
   const navigateNewLeave = () => navigation.navigate('LeaveRequest');
   const navigateNewExpense = () => navigation.navigate('ExpenseUpload');
   const navigateLeaveDetail = (id: string) => navigation.navigate('LeaveDetail', { leaveId: id });
@@ -123,12 +129,14 @@ function DashboardScreen({ navigation }: any) {
   const navigateAttendanceScan = () => navigation.navigate('AttendanceScan');
   const navigateAnnouncements = () => navigation.navigate('AnnouncementList');
   const navigateCompanyCalendar = () => navigation.navigate('CompanyCalendar');
+  const navigateInventory = () => navigation.navigate('Inventory');
+  const navigateMyAssignments = () => navigation.navigate('MyAssignments');
 
   if (role === 'idari' || role === 'admin') {
     return (
       <IdariDashboard
         onNavigateLeaveList={navigateLeaveList}
-        onNavigateExpenseList={navigateFinance} // Redirect expense list to Finance for Idari
+        onNavigateExpenseList={navigateFinance}
         onNavigateNewLeave={navigateNewLeave}
         onNavigateLeaveDetail={navigateLeaveDetail}
         onNavigateAttendanceQR={navigateAttendanceQR}
@@ -137,6 +145,8 @@ function DashboardScreen({ navigation }: any) {
         onNavigateAnnouncements={navigateAnnouncements}
         onNavigateCompanyCalendar={navigateCompanyCalendar}
         onNavigateDocuments={() => navigation.navigate('DocumentManagement')}
+        onNavigateInventory={navigateInventory}
+        onNavigateMyAssignments={navigateMyAssignments}
       />
     );
   }
@@ -150,6 +160,7 @@ function DashboardScreen({ navigation }: any) {
         onNavigateAnnouncements={navigateAnnouncements}
         onNavigateFinance={navigateFinance}
         onNavigateDocuments={() => navigation.navigate('DocumentManagement')}
+        onNavigateMyAssignments={navigateMyAssignments}
       />
     );
   }
@@ -163,6 +174,7 @@ function DashboardScreen({ navigation }: any) {
       onNavigateAttendance={navigateAttendanceScan}
       onNavigateAnnouncements={navigateAnnouncements}
       onNavigateCompanyCalendar={navigateCompanyCalendar}
+      onNavigateMyAssignments={navigateMyAssignments}
     />
   );
 }
@@ -512,6 +524,40 @@ function MainNavigator() {
             onNavigateInvoiceDetail={(id) => navigation.navigate('InvoiceDetail', { invoiceId: id })}
             onNavigateExpenseDetail={(id) => navigation.navigate('ExpenseDetail', { expenseId: id })}
           />
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="Inventory">
+        {({ navigation }) => (
+          <InventoryListScreen
+            onBack={() => navigation.goBack()}
+            onNavigateDetail={(id) => navigation.navigate('InventoryDetail', { itemId: id })}
+            onNavigateAdd={() => navigation.navigate('AddInventory')}
+          />
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="InventoryDetail">
+        {({ navigation, route }) => (
+          <InventoryDetailScreen
+            itemId={(route.params as any)?.itemId}
+            onBack={() => navigation.goBack()}
+          />
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="AddInventory">
+        {({ navigation }) => (
+          <AddInventoryItemScreen
+            onBack={() => navigation.goBack()}
+            onSuccess={() => navigation.goBack()}
+          />
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="MyAssignments">
+        {({ navigation }) => (
+          <MyAssignmentsScreen onBack={() => navigation.goBack()} />
         )}
       </Stack.Screen>
     </Stack.Navigator>

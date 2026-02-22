@@ -28,6 +28,7 @@ interface PersonelDashboardProps {
     onNavigateAttendance?: () => void;
     onNavigateAnnouncements?: () => void;
     onNavigateCompanyCalendar?: () => void;
+    onNavigateMyAssignments?: () => void;
 }
 
 const { width } = Dimensions.get('window');
@@ -40,6 +41,7 @@ export function PersonelDashboard({
     onNavigateAttendance,
     onNavigateAnnouncements,
     onNavigateCompanyCalendar,
+    onNavigateMyAssignments,
 }: PersonelDashboardProps) {
     const { profile } = useAuth();
     const { colors } = useTheme();
@@ -175,6 +177,17 @@ export function PersonelDashboard({
                             <Text style={[styles.actionText, { color: attendanceToday ? Colors.success : colors.text }]}>
                                 {attendanceToday ? 'Yoklama Tamam' : 'Yoklama'}
                             </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.actionCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                            onPress={onNavigateMyAssignments}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#10B981' + '10' }]}>
+                                <Ionicons name="pricetag-outline" size={22} color="#10B981" />
+                            </View>
+                            <Text style={[styles.actionText, { color: colors.text }]}>Zimmetlerim</Text>
                         </TouchableOpacity>
                     </ScrollView>
 
