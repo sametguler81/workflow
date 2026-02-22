@@ -116,10 +116,12 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
                 }
             }
         } catch (err: any) {
-            console.error('File pick error:', err);
             if (err.message && err.message.includes('Camera not available on simulator')) {
+                // Log warning optionally, but don't show full error stack
+                console.log('Warn: Camera not available on simulator.');
                 Alert.alert('Uyarı', 'Kamera simülatörde kullanılamaz. Lütfen test için "Galeri" veya "Belge" seçeneğini kullanın.');
             } else {
+                console.error('File pick error:', err);
                 Alert.alert('Hata', 'Dosya seçilemedi.');
             }
         }
