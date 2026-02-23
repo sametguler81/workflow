@@ -49,14 +49,16 @@ export function InvoiceListScreen({ onNavigateDetail, onNavigateCreate, onBack, 
     const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
     const lastDocRef = useRef<FirebaseFirestoreTypes.QueryDocumentSnapshot | null>(null);
 
+    const LIMIT = 10;
+
     const fetchInvoices = useCallback(
         async (isRefresh = false, currentFilter?: InvoiceFilter) => {
             if (!profile) return;
             const f = currentFilter || filter;
             try {
                 const result = isAdmin
-                    ? await getCompanyInvoices(profile.companyId, 20, isRefresh ? null : lastDocRef.current, f)
-                    : await getUserInvoices(profile.uid, profile.companyId, 20, isRefresh ? null : lastDocRef.current, f);
+                    ? await getCompanyInvoices(profile.companyId, LIMIT, isRefresh ? null : lastDocRef.current, f)
+                    : await getUserInvoices(profile.uid, profile.companyId, LIMIT, isRefresh ? null : lastDocRef.current, f);
 
                 if (isRefresh) {
                     setInvoices(result.data);
@@ -68,7 +70,7 @@ export function InvoiceListScreen({ onNavigateDetail, onNavigateCreate, onBack, 
                     });
                 }
                 lastDocRef.current = result.lastDoc;
-                setHasMore(result.data.length === 20);
+                setHasMore(result.data.length === LIMIT);
             } catch (err) {
                 console.error(err);
             } finally {
@@ -84,15 +86,16 @@ export function InvoiceListScreen({ onNavigateDetail, onNavigateCreate, onBack, 
 
     const onRefresh = async () => {
         setRefreshing(true);
+        lastDocRef.current = null;
         const fetchRefresh = async () => {
             if (!profile) return;
             try {
                 const result = isAdmin
-                    ? await getCompanyInvoices(profile.companyId, 20, null, filter)
-                    : await getUserInvoices(profile.uid, profile.companyId, 20, null, filter);
+                    ? await getCompanyInvoices(profile.companyId, LIMIT, null, filter)
+                    : await getUserInvoices(profile.uid, profile.companyId, LIMIT, null, filter);
                 setInvoices(result.data);
                 lastDocRef.current = result.lastDoc;
-                setHasMore(result.data.length === 20);
+                setHasMore(result.data.length === LIMIT);
             } catch (err) {
                 console.error(err);
             }

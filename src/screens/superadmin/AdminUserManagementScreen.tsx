@@ -9,6 +9,7 @@ import {
     Alert,
     ScrollView,
     RefreshControl,
+    ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -52,6 +53,11 @@ export function AdminUserManagementScreen({ onBack }: AdminUserManagementScreenP
     const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
     const [companyFilter, setCompanyFilter] = useState<string>('all'); // 'all' or companyId
 
+    // Pagination State
+    const [lastDoc, setLastDoc] = useState<any>(null);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+
     // Edit User State
     const [editUserModal, setEditUserModal] = useState(false);
     const [editingUser, setEditingUser] = useState<any>(null);
@@ -65,12 +71,14 @@ export function AdminUserManagementScreen({ onBack }: AdminUserManagementScreenP
     const fetchInitialData = useCallback(async () => {
         try {
             setLoading(true);
-            const [usersData, companiesData] = await Promise.all([
-                getUsers({ limit: 5 }), // Initial load: Last 5 users
+            const [usersDataResponse, companiesData] = await Promise.all([
+                getUsers({ limit: 10 }), // Initial load: 10 users
                 getAllCompanies()
             ]);
-            setUsers(usersData);
-            setFiltered(usersData);
+            setUsers(usersDataResponse.users);
+            setFiltered(usersDataResponse.users);
+            setLastDoc(usersDataResponse.lastDoc);
+            setHasMore(usersDataResponse.users.length === 10);
             setCompanies(companiesData);
         } catch (err) {
             console.error(err);
@@ -86,9 +94,12 @@ export function AdminUserManagementScreen({ onBack }: AdminUserManagementScreenP
             const data = await getUsers({
                 role: role !== 'all' ? role : undefined,
                 companyId: companyId !== 'all' ? companyId : undefined,
+                limit: 10
             });
-            setUsers(data);
-            setFiltered(data);
+            setUsers(data.users);
+            setFiltered(data.users);
+            setLastDoc(data.lastDoc);
+            setHasMore(data.users.length === 10);
         } catch (err) {
             console.error(err);
         } finally {
@@ -106,7 +117,8 @@ export function AdminUserManagementScreen({ onBack }: AdminUserManagementScreenP
     useEffect(() => {
         if (search.trim().length > 2) {
             const doSearch = async () => {
-                const allUsers = await getUsers({ limit: 50 }); // Fetch more for search
+                const searchResponse = await getUsers({ limit: 50 }); // Fetch more for search
+                const allUsers = searchResponse.users;
                 const q = search.toLowerCase();
                 const result = allUsers.filter((u: any) =>
                     u.displayName?.toLowerCase().includes(q) ||
@@ -117,9 +129,6 @@ export function AdminUserManagementScreen({ onBack }: AdminUserManagementScreenP
             }
             doSearch();
         } else if (search.trim().length === 0) {
-            // Restore current view based on filters
-            // But 'users' state currently holds what we fetched last.
-            // So we can just re-apply local filters.
             let result = [...users];
             if (roleFilter !== 'all') {
                 result = result.filter(u => u.role === roleFilter);
@@ -131,6 +140,33 @@ export function AdminUserManagementScreen({ onBack }: AdminUserManagementScreenP
         }
     }, [search, users, roleFilter, companyFilter]);
 
+    const loadMore = async () => {
+        if (!hasMore || loadingMore || loading || refreshing || search.trim().length > 2) return;
+
+        try {
+            setLoadingMore(true);
+            const data = await getUsers({
+                role: roleFilter !== 'all' ? roleFilter : undefined,
+                companyId: companyFilter !== 'all' ? companyFilter : undefined,
+                limit: 10,
+                startAfterDoc: lastDoc
+            });
+
+            if (data.users.length > 0) {
+                setUsers(prev => [...prev, ...data.users]);
+                setFiltered(prev => [...prev, ...data.users]);
+                setLastDoc(data.lastDoc);
+            }
+
+            if (data.users.length < 10) {
+                setHasMore(false);
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoadingMore(false);
+        }
+    };
 
     const onRefresh = () => { setRefreshing(true); fetchInitialData(); };
 
@@ -355,6 +391,15 @@ export function AdminUserManagementScreen({ onBack }: AdminUserManagementScreenP
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                    loadingMore ? (
+                        <View style={{ padding: 20 }}>
+                            <ActivityIndicator size="small" color={Colors.primary} />
+                        </View>
+                    ) : null
+                }
                 ListEmptyComponent={
                     <View style={styles.emptyWrap}>
                         <Ionicons name="people-outline" size={48} color={colors.textTertiary} />

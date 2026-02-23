@@ -19,13 +19,16 @@ interface SettingsScreenProps {
     onNavigateProfile: () => void;
     onNavigateCompanyManagement: () => void;
     onNavigatePrivacyPolicy: () => void;
+    onNavigateSubscription: () => void;
 }
 
-export function SettingsScreen({ onBack, onNavigateProfile, onNavigateCompanyManagement, onNavigatePrivacyPolicy }: SettingsScreenProps) {
+export function SettingsScreen({ onBack, onNavigateProfile, onNavigateCompanyManagement, onNavigatePrivacyPolicy, onNavigateSubscription }: SettingsScreenProps) {
     const { profile } = useAuth();
     const { colors, isDark, mode, setMode } = useTheme();
 
     const isAdmin = profile?.role === 'admin';
+    const isIdari = profile?.role === 'idari';
+    const canManageSubscription = isAdmin || isIdari;
 
     const handleLogout = () => {
         Alert.alert('Çıkış Yap', 'Hesabınızdan çıkış yapmak istediğinize emin misiniz?', [
@@ -73,6 +76,14 @@ export function SettingsScreen({ onBack, onNavigateProfile, onNavigateCompanyMan
                             colors={colors}
                         />
                     )}
+                    {canManageSubscription && (
+                        <SettingRow
+                            icon="card-outline"
+                            label="Aboneliklerim"
+                            onPress={onNavigateSubscription}
+                            colors={colors}
+                        />
+                    )}
                 </View>
 
                 {/* Appearance Section */}
@@ -99,7 +110,7 @@ export function SettingsScreen({ onBack, onNavigateProfile, onNavigateCompanyMan
                 <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
                     <View style={styles.aboutRow}>
                         <Text style={[styles.aboutLabel, { color: colors.textSecondary }]}>Versiyon</Text>
-                        <Text style={[styles.aboutValue, { color: colors.text }]}>1.0.2</Text>
+                        <Text style={[styles.aboutValue, { color: colors.text }]}>1.0.7</Text>
                     </View>
                     <View style={[styles.aboutRow, { borderBottomWidth: 0 }]}>
                         <Text style={[styles.aboutLabel, { color: colors.textSecondary }]}>Geliştirici</Text>

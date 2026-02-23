@@ -17,6 +17,7 @@ import {
 } from '@react-native-firebase/firestore';
 
 import { createAnnouncement } from './announcementService';
+import { notifyRolesInCompany, sendPushNotification } from './notificationService';
 
 const db = getFirestore();
 
@@ -79,6 +80,15 @@ export async function createExpense(
             relatedId: ref.id,
             relatedType: 'expense',
         });
+
+        // Push Notification to Muhasebe and Admin
+        await notifyRolesInCompany(
+            data.companyId,
+            ['muhasebe', 'admin', 'idari'],
+            'Yeni Masraf/Fiş Talebi',
+            `${data.userName}, ${data.amount} ₺ tutarında masraf ekledi.`,
+            { type: 'expense', id: ref.id }
+        );
     } catch (error) {
         console.error('Failed to send expense notification:', error);
     }
@@ -207,6 +217,20 @@ export async function updateExpenseStatus(
                 relatedId: expenseId,
                 relatedType: 'expense',
             });
+
+            // Push Notification to the employee
+            const userDocSnap = await getDoc(doc(db, 'users', data.userId));
+            if (userDocSnap.exists()) {
+                const userData = userDocSnap.data() as any;
+                if (userData.expoPushToken) {
+                    await sendPushNotification(
+                        userData.expoPushToken,
+                        'Masraf Durumu Güncellendi',
+                        message,
+                        { type: 'expense', id: expenseId }
+                    );
+                }
+            }
         }
     } catch (err) {
         console.error('Failed to notify expense status update', err);

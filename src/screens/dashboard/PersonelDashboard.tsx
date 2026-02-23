@@ -18,7 +18,7 @@ import { Colors, Spacing, BorderRadius, Shadows } from '../../theme/theme';
 import { getUserLeaves, LeaveRequest } from '../../services/leaveService';
 import { getUserExpenses, Expense } from '../../services/expenseService';
 import { hasCheckedInToday } from '../../services/attendanceService';
-import { getUnreadCount } from '../../services/announcementService';
+import { useNotifications } from '../../context/NotificationContext';
 
 interface PersonelDashboardProps {
     onNavigateLeaveList: () => void;
@@ -48,22 +48,20 @@ export function PersonelDashboard({
     const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [attendanceToday, setAttendanceToday] = useState(false);
-    const [unreadCount, setUnreadCount] = useState(0);
+    const { unreadCount } = useNotifications();
     const [refreshing, setRefreshing] = useState(false);
 
     const loadData = useCallback(async () => {
         if (!profile) return;
         try {
-            const [lRes, eRes, checkedIn, unread] = await Promise.all([
+            const [lRes, eRes, checkedIn] = await Promise.all([
                 getUserLeaves(profile.uid, profile.companyId),
                 getUserExpenses(profile.uid, profile.companyId),
                 hasCheckedInToday(profile.uid, profile.companyId),
-                getUnreadCount(profile.companyId, profile.uid, profile.role),
             ]);
             setLeaves(lRes.data);
             setExpenses(eRes.data);
             setAttendanceToday(checkedIn);
-            setUnreadCount(unread);
         } catch (err) {
             console.error(err);
         }

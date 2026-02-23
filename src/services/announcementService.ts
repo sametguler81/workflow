@@ -11,6 +11,7 @@ import {
     orderBy,
     deleteDoc,
     arrayUnion,
+    onSnapshot,
 } from '@react-native-firebase/firestore';
 
 const db = getFirestore();
@@ -85,6 +86,47 @@ export async function getUnreadCount(
 ): Promise<number> {
     const announcements = await getCompanyAnnouncements(companyId, userId, userRole);
     return announcements.filter((a) => !a.readBy?.includes(userId)).length;
+}
+
+// ─── Real-time Unread count Subscription ──────────────
+export function subscribeToUnreadCount(
+    companyId: string,
+    userId: string,
+    userRole: string | undefined,
+    onUpdate: (count: number) => void
+): () => void {
+    const q = query(
+        collection(db, 'announcements'),
+        where('companyId', '==', companyId),
+        orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const all = snapshot.docs.map((d: any) => ({ id: d.id, ...d.data() } as Announcement));
+
+        // Apply the same visibility logic as getCompanyAnnouncements
+        const visible = all.filter(
+            (a: Announcement) =>
+                !a.dismissedBy?.includes(userId) &&
+                (
+                    a.targetType === 'all' ||
+                    a.targetUserIds?.includes(userId) ||
+                    (a.targetRoles && userRole && (
+                        a.targetRoles.includes('all') ||
+                        a.targetRoles.includes(userRole)
+                    )) ||
+                    (a.type !== 'notification' && a.createdBy === userId)
+                )
+        );
+
+        const unreadCount = visible.filter((a: Announcement) => !a.readBy?.includes(userId)).length;
+        onUpdate(unreadCount);
+    }, (error) => {
+        console.error('Error listening to unread count:', error);
+        onUpdate(0);
+    });
+
+    return unsubscribe;
 }
 
 // ─── Mark as read ──────────────────────────────────────

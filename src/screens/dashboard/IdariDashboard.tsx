@@ -19,7 +19,7 @@ import { getCompanyLeaves, LeaveRequest } from '../../services/leaveService';
 import { getCompanyExpenses, Expense } from '../../services/expenseService';
 import { getCompanyMembers } from '../../services/companyService';
 import { getAttendanceByDate } from '../../services/attendanceService';
-import { getUnreadCount } from '../../services/announcementService';
+import { useNotifications } from '../../context/NotificationContext';
 
 interface IdariDashboardProps {
     onNavigateLeaveList: () => void;
@@ -57,7 +57,7 @@ export function IdariDashboard({
     const [myReceivables, setMyReceivables] = useState(0);
     const [memberCount, setMemberCount] = useState(0);
     const [attendanceCount, setAttendanceCount] = useState(0);
-    const [unreadCount, setUnreadCount] = useState(0);
+    const { unreadCount } = useNotifications();
     const [refreshing, setRefreshing] = useState(false);
     // Create a map for quick member lookup
     const [memberMap, setMemberMap] = useState<Record<string, any>>({});
@@ -73,12 +73,11 @@ export function IdariDashboard({
             const todayStr = `${y}-${m}-${d}`;
 
             // Fetch more expenses to ensure we catch debts
-            const [lRes, eRes, members, todayAttendance, unread] = await Promise.all([
+            const [lRes, eRes, members, todayAttendance] = await Promise.all([
                 getCompanyLeaves(profile.companyId),
                 getCompanyExpenses(profile.companyId, 100),
                 getCompanyMembers(profile.companyId),
                 getAttendanceByDate(profile.companyId, todayStr),
-                getUnreadCount(profile.companyId, profile.uid, profile.role),
             ]);
 
             // Calculate Receivables (Company owes me)
@@ -100,7 +99,6 @@ export function IdariDashboard({
             setExpenses(eRes.data);
             setMemberCount(targetMembers.length);
             setAttendanceCount(validAttendanceCount);
-            setUnreadCount(unread);
 
             // Populate member map for avatars
             const map: Record<string, any> = {};

@@ -57,7 +57,7 @@ export function ExpenseListScreen({ onNavigateDetail, onNavigateCreate, onBack, 
 
     const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
     const isReviewer = profile?.role === 'admin' || profile?.role === 'muhasebe' || profile?.role === 'idari';
-    const LIMIT = 20;
+    const LIMIT = 10;
 
     const loadData = useCallback(async (loadMore = false) => {
         if (!profile) return;
@@ -132,6 +132,8 @@ export function ExpenseListScreen({ onNavigateDetail, onNavigateCreate, onBack, 
 
     const applyFilters = (newFilters: any) => {
         setFilters(newFilters);
+        setLastDoc(null);
+        setHasMore(true);
         // If status changes in modal, update tab too if it matches one of the known tabs
         if (newFilters.status && ['all', 'pending', 'approved', 'rejected'].includes(newFilters.status)) {
             setActiveTab(newFilters.status);
@@ -140,7 +142,9 @@ export function ExpenseListScreen({ onNavigateDetail, onNavigateCreate, onBack, 
 
     const applyTab = (tab: typeof activeTab) => {
         setActiveTab(tab);
-        setFilters(prev => ({ ...prev, status: tab === 'all' ? 'all' : tab }));
+        setFilters((prev) => ({ ...prev, status: tab === 'all' ? 'all' : tab }));
+        setLastDoc(null);
+        setHasMore(true);
     };
 
     const tabs: { key: typeof activeTab; label: string }[] = [

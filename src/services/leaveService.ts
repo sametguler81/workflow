@@ -17,6 +17,8 @@ import {
 
 const db = getFirestore();
 import { createAnnouncement } from './announcementService';
+import { notifyRolesInCompany, sendPushNotification } from './notificationService';
+import { getDoc as getFirestoreDoc } from '@react-native-firebase/firestore';
 
 export type LeaveType = 'yillik' | 'hastalik' | 'ucretsiz';
 export type LeaveStatus = 'pending' | 'approved' | 'rejected';
@@ -69,6 +71,15 @@ export async function createLeaveRequest(
             relatedId: ref.id,
             relatedType: 'leave',
         });
+
+        // Push Notification to Managers and Admins
+        await notifyRolesInCompany(
+            data.companyId,
+            ['idari', 'admin'],
+            'Yeni İzin Talebi',
+            `${data.userName}, ${getLeaveTypeLabel(data.type)} talep etti.`,
+            { type: 'leave', id: ref.id }
+        );
     } catch (error) {
         console.error('Failed to send leave notification:', error);
     }
@@ -196,6 +207,20 @@ export async function updateLeaveStatus(
                 relatedId: leaveId,
                 relatedType: 'leave',
             });
+
+            // Push Notification to the employee who requested it
+            const userDocSnap = await getFirestoreDoc(doc(db, 'users', data.userId));
+            if (userDocSnap.exists()) {
+                const userData = userDocSnap.data() as any;
+                if (userData.expoPushToken) {
+                    await sendPushNotification(
+                        userData.expoPushToken,
+                        'İzin Talebi Cevaplandı',
+                        message,
+                        { type: 'leave', id: leaveId }
+                    );
+                }
+            }
         }
     } catch (err) {
         console.error('Failed to notify leave status update', err);

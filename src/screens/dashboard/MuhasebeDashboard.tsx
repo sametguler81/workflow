@@ -15,7 +15,7 @@ import { DashboardHeader } from '../../components/DashboardHeader';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Colors, Spacing, BorderRadius, Shadows } from '../../theme/theme';
 import { getCompanyExpenses, Expense } from '../../services/expenseService';
-import { getUnreadCount } from '../../services/announcementService';
+import { useNotifications } from '../../context/NotificationContext';
 
 interface MuhasebeDashboardProps {
     onNavigateExpenseList: () => void;
@@ -39,18 +39,15 @@ export function MuhasebeDashboard({
     const { profile } = useAuth();
     const { colors } = useTheme();
     const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [unreadCount, setUnreadCount] = useState(0);
+    const [stats, setStats] = useState<any>(null); // Assuming stats type
+    const { unreadCount } = useNotifications();
     const [refreshing, setRefreshing] = useState(false);
 
     const loadData = useCallback(async () => {
         if (!profile) return;
         try {
-            const [res, unread] = await Promise.all([
-                getCompanyExpenses(profile.companyId),
-                getUnreadCount(profile.companyId, profile.uid, profile.role),
-            ]);
+            const res = await getCompanyExpenses(profile.companyId);
             setExpenses(res.data);
-            setUnreadCount(unread);
         } catch (err) {
             console.error(err);
         }

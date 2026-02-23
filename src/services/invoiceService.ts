@@ -16,6 +16,7 @@ import {
 } from '@react-native-firebase/firestore';
 
 import { createAnnouncement } from './announcementService';
+import { notifyRolesInCompany, sendPushNotification } from './notificationService';
 
 const db = getFirestore();
 
@@ -93,6 +94,15 @@ export async function createInvoice(
             relatedId: ref.id,
             relatedType: 'invoice',
         });
+
+        // Push Notification to Muhasebe and Admin directly
+        await notifyRolesInCompany(
+            data.companyId,
+            ['muhasebe', 'admin', 'idari'],
+            'Yeni Fatura/Belge Yüklendi',
+            `${data.userName}, ${data.amount} ₺ tutarında ${DOCUMENT_TYPE_LABELS[data.documentType]} ekledi.`,
+            { type: 'invoice', id: ref.id }
+        );
     } catch (error) {
         console.error('Failed to send invoice notification:', error);
     }
@@ -228,6 +238,20 @@ export async function updateInvoiceStatus(
                 relatedId: invoiceId,
                 relatedType: 'invoice',
             });
+
+            // Push Notification to the employee who uploaded
+            const userDocSnap = await getDoc(doc(db, 'users', data.userId));
+            if (userDocSnap.exists()) {
+                const userData = userDocSnap.data() as any;
+                if (userData.expoPushToken) {
+                    await sendPushNotification(
+                        userData.expoPushToken,
+                        'Belge Durumu Güncellendi',
+                        message,
+                        { type: 'invoice', id: invoiceId }
+                    );
+                }
+            }
         }
     } catch (err) {
         console.error('Failed to notify invoice status update', err);

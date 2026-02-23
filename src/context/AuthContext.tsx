@@ -5,6 +5,7 @@ import {
     getUserProfile,
     UserProfile,
 } from '../services/authService';
+import { registerForPushNotificationsAsync, saveUserPushToken } from '../services/notificationService';
 
 type User = FirebaseAuthTypes.User;
 
@@ -30,6 +31,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 try {
                     const p = await getUserProfile(firebaseUser.uid);
                     setProfile(p);
+
+                    // Register for push notifications and save token
+                    const token = await registerForPushNotificationsAsync();
+                    if (token) {
+                        await saveUserPushToken(firebaseUser.uid, token);
+                    }
                 } catch (err) {
                     console.error('Failed to load profile:', err);
                     setProfile(null);

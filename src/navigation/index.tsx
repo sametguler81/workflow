@@ -42,6 +42,7 @@ import { AttendanceReportScreen } from '../screens/attendance/AttendanceReportSc
 // Profile & Settings
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
+import { SubscriptionScreen } from '../screens/settings/SubscriptionScreen';
 import { CompanyManagementScreen } from '../screens/settings/CompanyManagementScreen';
 
 // Privacy Policy
@@ -212,6 +213,7 @@ function SettingsTabScreen({ navigation }: any) {
       onNavigateProfile={() => navigation.navigate('Profile')}
       onNavigateCompanyManagement={() => navigation.navigate('CompanyManagement')}
       onNavigatePrivacyPolicy={() => navigation.navigate('PrivacyPolicy')}
+      onNavigateSubscription={() => navigation.navigate('Subscription')}
     />
   );
 }
@@ -447,7 +449,13 @@ function MainNavigator() {
             onNavigateProfile={() => navigation.navigate('Profile')}
             onNavigateCompanyManagement={() => navigation.navigate('CompanyManagement')}
             onNavigatePrivacyPolicy={() => navigation.navigate('PrivacyPolicy')}
+            onNavigateSubscription={() => navigation.navigate('Subscription')}
           />
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="Subscription">
+        {({ navigation }) => (
+          <SubscriptionScreen onBack={() => navigation.goBack()} />
         )}
       </Stack.Screen>
       <Stack.Screen name="PrivacyPolicy">

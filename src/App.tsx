@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from './context/AuthContext';
 import { OfflineProvider } from './context/OfflineContext';
 import { ThemeProvider, useTheme } from './theme/ThemeContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { Navigation } from './navigation';
 import { OfflineBanner } from './components/OfflineBanner';
 
@@ -29,7 +30,9 @@ export function App() {
       <ThemeProvider>
         <AuthProvider>
           <OfflineProvider>
-            <AppContent />
+            <NotificationProvider>
+              <AppContent />
+            </NotificationProvider>
           </OfflineProvider>
         </AuthProvider>
       </ThemeProvider>

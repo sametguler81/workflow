@@ -162,15 +162,15 @@ export function AnnouncementListScreen({ onBack, onNavigateCreate }: Announcemen
                 </Text>
                 <View style={styles.cardFooter}>
                     <View style={[styles.targetBadge, {
-                        backgroundColor: item.targetRole ? Colors.warning + '20' : (item.targetType === 'all' ? Colors.success + '20' : Colors.secondary + '20')
+                        backgroundColor: item.targetRoles && item.targetRoles.length > 0 ? Colors.warning + '20' : (item.targetType === 'all' ? Colors.success + '20' : Colors.secondary + '20')
                     }]}>
                         <Ionicons
-                            name={item.targetRole ? 'shield-checkmark' : (item.targetType === 'all' ? 'people' : 'person')}
+                            name={item.targetRoles && item.targetRoles.length > 0 ? 'shield-checkmark' : (item.targetType === 'all' ? 'people' : 'person')}
                             size={12}
-                            color={item.targetRole ? Colors.warning : (item.targetType === 'all' ? Colors.success : Colors.secondary)}
+                            color={item.targetRoles && item.targetRoles.length > 0 ? Colors.warning : (item.targetType === 'all' ? Colors.success : Colors.secondary)}
                         />
-                        <Text style={{ fontSize: 11, color: item.targetRole ? Colors.warning : (item.targetType === 'all' ? Colors.success : Colors.secondary), fontWeight: '600' }}>
-                            {item.targetRole ? (item.targetRole === 'idari' ? 'İdari Ekip' : item.targetRole === 'muhasebe' ? 'Muhasebe' : item.targetRole.toUpperCase()) : (item.targetType === 'all' ? 'Herkese' : 'Seçili Kişiler')}
+                        <Text style={{ fontSize: 11, color: item.targetRoles && item.targetRoles.length > 0 ? Colors.warning : (item.targetType === 'all' ? Colors.success : Colors.secondary), fontWeight: '600' }}>
+                            {item.targetRoles && item.targetRoles.length > 0 ? (item.targetRoles.includes('all') ? 'TÜMÜ' : item.targetRoles.includes('idari') ? 'İdari Ekip' : item.targetRoles.includes('muhasebe') ? 'Muhasebe' : item.targetRoles.join(', ').toUpperCase()) : (item.targetType === 'all' ? 'Herkese' : 'Seçili Kişiler')}
                         </Text>
                     </View>
                 </View>
@@ -268,8 +268,8 @@ export function AnnouncementListScreen({ onBack, onNavigateCreate }: Announcemen
                                                 color={selectedAnnouncement.targetType === 'all' ? Colors.success : Colors.secondary}
                                             />
                                             <Text style={{ fontSize: 12, color: selectedAnnouncement.targetType === 'all' ? Colors.success : Colors.secondary, fontWeight: '600' }}>
-                                                {selectedAnnouncement.targetRole
-                                                    ? `Hedef: ${selectedAnnouncement.targetRole.toUpperCase()}`
+                                                {selectedAnnouncement.targetRoles && selectedAnnouncement.targetRoles.length > 0
+                                                    ? `Hedef: ${selectedAnnouncement.targetRoles.includes('all') ? 'TÜMÜ' : selectedAnnouncement.targetRoles.join(', ').toUpperCase()}`
                                                     : (selectedAnnouncement.targetType === 'all' ? 'Herkese Gönderildi' : 'Seçili Kişilere Gönderildi')}
                                             </Text>
                                         </View>

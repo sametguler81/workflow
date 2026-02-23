@@ -11,6 +11,7 @@ import {
     setDoc,
     orderBy,
     limit,
+    startAfter,
 } from '@react-native-firebase/firestore';
 import {
     getAuth,
@@ -186,7 +187,7 @@ export async function deleteCompany(companyId: string): Promise<void> {
 
 // ─── Kullanıcı İşlemleri ──────────────────────────────────
 
-export async function getUsers(filters: { role?: string; companyId?: string; limit?: number } = {}) {
+export async function getUsers(filters: { role?: string; companyId?: string; limit?: number; startAfterDoc?: any; } = {}) {
     let q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
 
     if (filters.role && filters.role !== 'all') {
@@ -197,12 +198,19 @@ export async function getUsers(filters: { role?: string; companyId?: string; lim
         q = query(q, where('companyId', '==', filters.companyId));
     }
 
+    if (filters.startAfterDoc) {
+        q = query(q, startAfter(filters.startAfterDoc));
+    }
+
     if (filters.limit) {
         q = query(q, limit(filters.limit));
     }
 
     const snap = await getDocs(q);
-    return snap.docs.map((d: any) => ({ uid: d.id, ...d.data() }));
+    const users = snap.docs.map((d: any) => ({ uid: d.id, ...d.data() }));
+    const lastDoc = snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
+
+    return { users, lastDoc };
 }
 
 export async function updateUserRoleAdmin(
