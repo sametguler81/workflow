@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../theme/ThemeContext';
 import { Colors, Spacing, BorderRadius, Shadows } from '../../theme/theme';
 import { createExpense, updateExpense, Expense } from '../../services/expenseService';
+import TextRecognition from '@react-native-ml-kit/text-recognition';
 
 interface ExpenseUploadScreenProps {
     onBack: () => void;
@@ -128,17 +129,88 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
         }
     };
 
+    const parseAmountFromText = (text: string): string | null => {
+        const lines = text.split('\n');
+        let bestAmount: string | null = null;
+
+        // Look for TOPLAM / TOTAL / GENEL TOPLAM lines first
+        for (const line of lines) {
+            const upper = line.toUpperCase();
+            if (upper.includes('TOPLAM') || upper.includes('TOTAL') || upper.includes('GENEL')) {
+                // Match amounts like 350,75 or 350.75 or *350,75 or ₺350.75
+                const amountMatch = line.match(/[*₺]?\s*(\d{1,6}[.,]\d{2})/);
+                if (amountMatch) {
+                    bestAmount = amountMatch[1].replace(',', '.');
+                }
+            }
+        }
+
+        // Fallback: find the largest number with decimals in the text
+        if (!bestAmount) {
+            const allAmounts = text.match(/(\d{1,6}[.,]\d{2})/g);
+            if (allAmounts && allAmounts.length > 0) {
+                let max = 0;
+                for (const a of allAmounts) {
+                    const num = parseFloat(a.replace(',', '.'));
+                    if (num > max) {
+                        max = num;
+                        bestAmount = a.replace(',', '.');
+                    }
+                }
+            }
+        }
+
+        return bestAmount;
+    };
+
+    const parseDateFromText = (text: string): string | null => {
+        // Match DD/MM/YYYY or DD.MM.YYYY or DD-MM-YYYY
+        const dateMatch = text.match(/(\d{2})[./\-](\d{2})[./\-](\d{4})/);
+        if (dateMatch) {
+            return `${dateMatch[1]}.${dateMatch[2]}.${dateMatch[3]}`;
+        }
+        // Match DD/MM/YY
+        const shortDateMatch = text.match(/(\d{2})[./\-](\d{2})[./\-](\d{2})/);
+        if (shortDateMatch) {
+            return `${shortDateMatch[1]}.${shortDateMatch[2]}.20${shortDateMatch[3]}`;
+        }
+        return null;
+    };
+
     const runSmartOCR = async () => {
         if (!imageUri) return;
         setOcrLoading(true);
         try {
-            await new Promise((resolve) => setTimeout(resolve, 800)); // Short artificial delay for UX
-            Alert.alert(
-                'Akıllı Fiş Okuma (Çok Yakında!) 🚀',
-                'Yapay zeka modelimiz şu an eğitiliyor. Yakında fişlerinizi yüklediğiniz an tarayıp formu otomatik dolduracağız!'
-            );
-        } catch (err) {
-            console.error(err);
+            const result = await TextRecognition.recognize(imageUri);
+            const fullText = result.text;
+
+            if (!fullText || fullText.trim().length < 3) {
+                Alert.alert('Okunamadı', 'Fiş üzerinde metin tespit edilemedi. Lütfen daha net bir fotoğraf çekin.');
+                return;
+            }
+
+            const extractedAmount = parseAmountFromText(fullText);
+            const extractedDate = parseDateFromText(fullText);
+
+            let message = '';
+
+            if (extractedAmount) {
+                setAmount(extractedAmount);
+                message += `Tutar: ${extractedAmount} ₺\n`;
+            }
+            if (extractedDate) {
+                setDate(extractedDate);
+                message += `Tarih: ${extractedDate}\n`;
+            }
+
+            if (message) {
+                Alert.alert('Akıllı Fiş Okuma ✅', `Fiş üzerinden aşağıdaki bilgiler okundu:\n\n${message}\nLütfen bilgileri kontrol edin.`);
+            } else {
+                Alert.alert('Kısmi Okuma', 'Fiş okundu ancak tutar veya tarih otomatik tespit edilemedi. Lütfen manuel olarak girin.');
+            }
+        } catch (err: any) {
+            console.error('OCR Error:', err);
+            Alert.alert('Hata', 'Fiş okunamadı. Lütfen daha net bir fotoğraf deneyin veya bilgileri manuel girin.');
         } finally {
             setOcrLoading(false);
         }
@@ -300,10 +372,10 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
                                 {/* Smart OCR Beta Button */}
                                 {fileType === 'image' && (
                                     <PremiumButton
-                                        title={ocrLoading ? 'Yapay Zeka Analiz Ediyor...' : 'Akıllı Asistan ile Oku (Yakında ✨)'}
+                                        title={ocrLoading ? 'Yapay Zeka Okuyor...' : '🤖 Akıllı Fiş Okuma'}
                                         onPress={runSmartOCR}
                                         loading={ocrLoading}
-                                        icon={<Ionicons name="sparkles" size={18} color="#FFF" />}
+                                        icon={<Ionicons name="scan" size={18} color="#FFF" />}
                                         style={{ marginTop: Spacing.md }}
                                     />
                                 )}
