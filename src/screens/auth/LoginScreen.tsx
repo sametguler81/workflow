@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     Alert,
     Dimensions,
+    Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -74,7 +75,11 @@ export function LoginScreen({ onNavigateRegister, onNavigateForgotPassword }: Lo
                     >
                         <View style={styles.logoContainer}>
                             <View style={styles.logoCircle}>
-                                <Ionicons name="briefcase" size={36} color={Colors.primary} />
+                                <Image
+                                    source={require('../../../assets/logo.png')}
+                                    style={styles.logoImage}
+                                    resizeMode="contain"
+                                />
                             </View>
                         </View>
                         <Text style={styles.appName}>WorkFlow360</Text>
@@ -161,12 +166,17 @@ const styles = StyleSheet.create({
     },
     logoContainer: { marginBottom: 16 },
     logoCircle: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: 'rgba(255,255,255,0.95)',
+        width: 80,
+        height: 80,
+        borderRadius: 40,
         justifyContent: 'center',
         alignItems: 'center',
+        overflow: 'hidden',
+    },
+    logoImage: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
     },
     appName: {
         fontSize: 30,
