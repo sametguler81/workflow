@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { InputField } from '../../components/InputField';
 import { PremiumButton } from '../../components/PremiumButton';
 import { Colors, Spacing, BorderRadius } from '../../theme/theme';
@@ -31,8 +32,12 @@ export function RegisterScreen({ onNavigateLogin }: RegisterScreenProps) {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [selectedPlan, setSelectedPlan] = useState<PlanType>('free');
+    const [isTermsAccepted, setIsTermsAccepted] = useState(false);
+    const [isKvkkAccepted, setIsKvkkAccepted] = useState(false);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+
+    const navigation = useNavigation<any>();
 
     const validateStep1 = () => {
         const e: Record<string, string> = {};
@@ -58,8 +63,16 @@ export function RegisterScreen({ onNavigateLogin }: RegisterScreenProps) {
         else if (step === 2 && validateStep2()) setStep(3);
     };
 
+    const validateStep3 = () => {
+        if (!isTermsAccepted || !isKvkkAccepted) {
+            Alert.alert('Eksik Bilgi', 'Kayıt olabilmek için Kullanıcı Sözleşmesi ve KVKK metnini onaylamanız gerekmektedir.');
+            return false;
+        }
+        return true;
+    };
+
     const handleRegister = async () => {
-        if (!validateStep2()) return;
+        if (!validateStep2() || !validateStep3()) return;
         setLoading(true);
         try {
             await registerUser(email.trim(), password, displayName.trim(), companyName.trim(), selectedPlan);
@@ -235,6 +248,26 @@ export function RegisterScreen({ onNavigateLogin }: RegisterScreenProps) {
                                         </TouchableOpacity>
                                     );
                                 })}
+
+                                <View style={styles.agreementsContainer}>
+                                    <TouchableOpacity style={styles.agreementRow} onPress={() => setIsTermsAccepted(!isTermsAccepted)} activeOpacity={0.7}>
+                                        <Ionicons name={isTermsAccepted ? "checkbox" : "square-outline"} size={22} color={isTermsAccepted ? Colors.primary : colors.textSecondary} />
+                                        <View style={{ flex: 1, marginLeft: 8 }}>
+                                            <Text style={[styles.agreementText, { color: colors.textSecondary }]}>
+                                                <Text style={{ color: Colors.primary, fontWeight: 'bold' }} onPress={() => navigation.navigate('TermsOfService')}>Kullanıcı Sözleşmesini</Text> okudum ve kabul ediyorum.
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity style={styles.agreementRow} onPress={() => setIsKvkkAccepted(!isKvkkAccepted)} activeOpacity={0.7}>
+                                        <Ionicons name={isKvkkAccepted ? "checkbox" : "square-outline"} size={22} color={isKvkkAccepted ? Colors.primary : colors.textSecondary} />
+                                        <View style={{ flex: 1, marginLeft: 8 }}>
+                                            <Text style={[styles.agreementText, { color: colors.textSecondary }]}>
+                                                <Text style={{ color: Colors.primary, fontWeight: 'bold' }} onPress={() => navigation.navigate('Kvkk')}>KVKK Aydınlatma Metnini</Text> okudum ve açık rızam ile kabul ediyorum.
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                </View>
 
                                 <View style={styles.buttonRow}>
                                     <PremiumButton
@@ -415,5 +448,18 @@ const styles = StyleSheet.create({
     },
     featureText: {
         fontSize: 12,
+    },
+    agreementsContainer: {
+        marginTop: Spacing.sm,
+        marginBottom: Spacing.xl,
+        gap: Spacing.md,
+    },
+    agreementRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    agreementText: {
+        fontSize: 12,
+        lineHeight: 18,
     },
 });

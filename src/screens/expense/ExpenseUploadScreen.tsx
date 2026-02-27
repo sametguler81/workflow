@@ -42,6 +42,7 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
     const [loading, setLoading] = useState(false);
     const [fileName, setFileName] = useState(expenseToEdit ? 'Mevcut Belge' : '');
     const [fileType, setFileType] = useState<'image' | 'pdf'>('image');
+    const [ocrLoading, setOcrLoading] = useState(false);
 
     useEffect(() => {
         if (expenseToEdit) {
@@ -124,6 +125,22 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
                 console.error('File pick error:', err);
                 Alert.alert('Hata', 'Dosya seçilemedi.');
             }
+        }
+    };
+
+    const runSmartOCR = async () => {
+        if (!imageUri) return;
+        setOcrLoading(true);
+        try {
+            await new Promise((resolve) => setTimeout(resolve, 800)); // Short artificial delay for UX
+            Alert.alert(
+                'Akıllı Fiş Okuma (Çok Yakında!) 🚀',
+                'Yapay zeka modelimiz şu an eğitiliyor. Yakında fişlerinizi yüklediğiniz an tarayıp formu otomatik dolduracağız!'
+            );
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setOcrLoading(false);
         }
     };
 
@@ -279,6 +296,17 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
                                 <Text style={{ textAlign: 'center', fontSize: 12, color: colors.textTertiary, marginTop: -10 }}>
                                     Değiştirmek için görselin üzerine tıklayın
                                 </Text>
+
+                                {/* Smart OCR Beta Button */}
+                                {fileType === 'image' && (
+                                    <PremiumButton
+                                        title={ocrLoading ? 'Yapay Zeka Analiz Ediyor...' : 'Akıllı Asistan ile Oku (Yakında ✨)'}
+                                        onPress={runSmartOCR}
+                                        loading={ocrLoading}
+                                        icon={<Ionicons name="sparkles" size={18} color="#FFF" />}
+                                        style={{ marginTop: Spacing.md }}
+                                    />
+                                )}
                             </View>
                         ) : (
                             <View style={styles.pickerRow}>

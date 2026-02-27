@@ -19,6 +19,10 @@ import { LoginScreen } from '../screens/auth/LoginScreen';
 import { RegisterScreen } from '../screens/auth/RegisterScreen';
 import { ForgotPasswordScreen } from '../screens/auth/ForgotPasswordScreen';
 
+// Legal Screens
+import { TermsOfServiceScreen } from '../screens/settings/TermsOfServiceScreen';
+import { KvkkScreen } from '../screens/settings/KvkkScreen';
+
 // Dashboard Screens
 import { PersonelDashboard } from '../screens/dashboard/PersonelDashboard';
 import { IdariDashboard } from '../screens/dashboard/IdariDashboard';
@@ -108,6 +112,16 @@ function AuthNavigator() {
       <Stack.Screen name="ForgotPassword">
         {({ navigation }) => (
           <ForgotPasswordScreen onNavigateLogin={() => navigation.goBack()} />
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="TermsOfService">
+        {({ navigation }) => (
+          <TermsOfServiceScreen onBack={() => navigation.goBack()} />
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="Kvkk">
+        {({ navigation }) => (
+          <KvkkScreen onBack={() => navigation.goBack()} />
         )}
       </Stack.Screen>
     </Stack.Navigator>
