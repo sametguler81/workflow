@@ -361,7 +361,10 @@ function calculateDocSize(data: any): number {
 /**
  * Tracks storage usage for expenses
  */
-export const trackExpenseStorage = onDocumentWritten('expenses/{expenseId}', async (event) => {
+export const trackExpenseStorage = onDocumentWritten({
+    document: 'expenses/{expenseId}',
+    region: 'europe-west1'
+}, async (event) => {
     const beforeData = event.data?.before.data();
     const afterData = event.data?.after.data();
 
@@ -383,7 +386,10 @@ export const trackExpenseStorage = onDocumentWritten('expenses/{expenseId}', asy
 /**
  * Tracks storage usage for invoices
  */
-export const trackInvoiceStorage = onDocumentWritten('invoices/{invoiceId}', async (event) => {
+export const trackInvoiceStorage = onDocumentWritten({
+    document: 'invoices/{invoiceId}',
+    region: 'europe-west1'
+}, async (event) => {
     const beforeData = event.data?.before.data();
     const afterData = event.data?.after.data();
 

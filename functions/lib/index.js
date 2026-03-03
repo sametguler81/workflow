@@ -45,9 +45,10 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkExpiredSubscriptions = exports.validateReceipt = void 0;
+exports.trackInvoiceStorage = exports.trackExpenseStorage = exports.checkExpiredSubscriptions = exports.sendNotification = exports.validateReceipt = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
+const firestore_1 = require("firebase-functions/v2/firestore");
 const admin = __importStar(require("firebase-admin"));
 admin.initializeApp();
 const db = admin.firestore();
@@ -124,38 +125,53 @@ async function validateGoogleReceipt(receipt, productId) {
 }
 // ─── Cloud Functions (v2) ──────────────────────────────
 /**
- * Receipt doğrulama endpoint'i
+ * Receipt doğrulama endpoint'i (Authenticated)
+ *
+ * ✅ Güvenlik:
+ * - Firebase Auth ile kimlik doğrulama zorunlu
+ * - companyId sunucu tarafında kullanıcı profilinden alınıyor (client'a güvenilmiyor)
+ * - Kullanıcının admin/owner olduğu doğrulanıyor
  */
-exports.validateReceipt = (0, https_1.onRequest)(async (req, res) => {
-    // CORS
-    res.set('Access-Control-Allow-Origin', '*');
-    if (req.method === 'OPTIONS') {
-        res.set('Access-Control-Allow-Methods', 'POST');
-        res.set('Access-Control-Allow-Headers', 'Content-Type');
-        res.status(204).send('');
-        return;
+exports.validateReceipt = (0, https_1.onCall)(async (request) => {
+    // 1. Auth kontrolü
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Giriş yapmanız gerekiyor.');
     }
-    if (req.method !== 'POST') {
-        res.status(405).json({ error: 'Method not allowed' });
-        return;
+    const uid = request.auth.uid;
+    const { receipt, productId, platform } = request.data;
+    // 2. Input validasyonu
+    if (!receipt || !productId || !platform) {
+        throw new https_1.HttpsError('invalid-argument', 'Eksik alanlar: receipt, productId, platform');
     }
-    const { receipt, productId, companyId, platform } = req.body;
-    if (!receipt || !productId || !companyId || !platform) {
-        res.status(400).json({
-            valid: false,
-            error: 'Missing required fields: receipt, productId, companyId, platform',
-        });
-        return;
+    if (!['ios', 'android'].includes(platform)) {
+        throw new https_1.HttpsError('invalid-argument', 'Geçersiz platform. ios veya android olmalı.');
     }
     const planMapping = PRODUCT_TO_PLAN[productId];
     if (!planMapping) {
-        res.status(400).json({
-            valid: false,
-            error: `Unknown product ID: ${productId}`,
-        });
-        return;
+        throw new https_1.HttpsError('invalid-argument', `Bilinmeyen ürün ID: ${productId}`);
+    }
+    // 3. Kullanıcı profilinden companyId'yi sunucu tarafında al
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+        throw new https_1.HttpsError('not-found', 'Kullanıcı profili bulunamadı.');
+    }
+    const userData = userDoc.data();
+    const companyId = userData.companyId;
+    const userRole = userData.role;
+    if (!companyId) {
+        throw new https_1.HttpsError('failed-precondition', 'Kullanıcının bir firmaya ait olması gerekiyor.');
+    }
+    // 4. Sadece admin/owner plan değiştirebilir
+    if (!['admin', 'superadmin'].includes(userRole)) {
+        throw new https_1.HttpsError('permission-denied', 'Plan değiştirme yetkiniz yok. Sadece firma yöneticileri plan değiştirebilir.');
+    }
+    // 5. Firma varlık kontrolü
+    const companyDoc = await db.collection('companies').doc(companyId).get();
+    if (!companyDoc.exists) {
+        throw new https_1.HttpsError('not-found', 'Firma bulunamadı.');
     }
     try {
+        // 6. Receipt doğrulama
         let validationResult;
         if (platform === 'ios') {
             validationResult = await validateAppleReceipt(receipt, process.env.APPLE_SHARED_SECRET || '');
@@ -164,12 +180,9 @@ exports.validateReceipt = (0, https_1.onRequest)(async (req, res) => {
             validationResult = await validateGoogleReceipt(receipt, productId);
         }
         if (!validationResult.valid) {
-            res.status(400).json({
-                valid: false,
-                error: 'Receipt validation failed',
-            });
-            return;
+            throw new https_1.HttpsError('invalid-argument', 'Receipt doğrulama başarısız.');
         }
+        // 7. Plan güncelleme (Admin SDK ile — Firestore kurallarını bypass eder)
         const { plan, period } = planMapping;
         await db.collection('companies').doc(companyId).update({
             plan: plan,
@@ -181,8 +194,10 @@ exports.validateReceipt = (0, https_1.onRequest)(async (req, res) => {
             subscriptionProductId: productId,
             subscriptionPlatform: platform,
         });
+        // 8. Log kaydı
         await db.collection('subscriptionLogs').add({
             companyId,
+            userId: uid,
             productId,
             plan,
             period,
@@ -191,21 +206,71 @@ exports.validateReceipt = (0, https_1.onRequest)(async (req, res) => {
             expiresAt: validationResult.expiresAt,
             createdAt: new Date().toISOString(),
         });
-        console.log(`✅ Plan updated: ${companyId} → ${plan} (${period})`);
-        res.json({
+        console.log(`✅ Plan updated: ${companyId} → ${plan} (${period}) by user ${uid}`);
+        return {
             valid: true,
             plan,
             period,
             expiresAt: validationResult.expiresAt,
-        });
+        };
     }
     catch (error) {
+        // HttpsError'ları tekrar fırlat
+        if (error instanceof https_1.HttpsError) {
+            throw error;
+        }
         console.error('Receipt validation error:', error);
-        res.status(500).json({
-            valid: false,
-            error: 'Internal server error',
-        });
+        throw new https_1.HttpsError('internal', 'Sunucu hatası oluştu.');
     }
+});
+/**
+ * Push bildirim gönderme (Server-Side)
+ *
+ * ✅ Güvenlik:
+ * - Client'tan doğrudan Expo API çağrılmak yerine buradan gönderilir
+ * - Auth zorunlu, sadece firma üyeleri kendi firmasına bildirim gönderebilir
+ */
+exports.sendNotification = (0, https_1.onCall)(async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'Giriş yapmanız gerekiyor.');
+    }
+    const uid = request.auth.uid;
+    const { targetTokens, title, body, data } = request.data;
+    if (!targetTokens || !title || !body) {
+        throw new https_1.HttpsError('invalid-argument', 'Eksik alanlar: targetTokens, title, body');
+    }
+    // Kullanıcı doğrulama
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+        throw new https_1.HttpsError('not-found', 'Kullanıcı bulunamadı.');
+    }
+    // Bildirim gönder
+    const results = [];
+    for (const token of targetTokens) {
+        try {
+            await fetch('https://exp.host/--/api/v2/push/send', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Accept-encoding': 'gzip, deflate',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    to: token,
+                    sound: 'default',
+                    title,
+                    body,
+                    data: data || {},
+                }),
+            });
+            results.push({ token, success: true });
+        }
+        catch (error) {
+            console.error(`Push notification error for token ${token}:`, error);
+            results.push({ token, success: false });
+        }
+    }
+    return { sent: results.length, results };
 });
 /**
  * Abonelik süresi dolan firmaları kontrol eder.
@@ -246,6 +311,69 @@ exports.checkExpiredSubscriptions = (0, scheduler_1.onSchedule)('every 24 hours'
     }
     catch (error) {
         console.error('Expired subscription check error:', error);
+    }
+});
+// ─── Storage Tracking ────────────────────────────────────────
+/**
+ * Calculates approximate byte size of a document.
+ * We primarily care about imageBase64 as it constitutes 99% of storage.
+ */
+function calculateDocSize(data) {
+    if (!data)
+        return 0;
+    let size = 0;
+    // Base64 string in memory is ~1 byte per char, but actual disk size is 3/4
+    if (data.imageBase64 && typeof data.imageBase64 === 'string') {
+        size += Math.round((data.imageBase64.length * 3) / 4);
+    }
+    // Add a base size (rough estimate of other fields)
+    size += JSON.stringify(data).length;
+    return size;
+}
+/**
+ * Tracks storage usage for expenses
+ */
+exports.trackExpenseStorage = (0, firestore_1.onDocumentWritten)({
+    document: 'expenses/{expenseId}',
+    region: 'europe-west1'
+}, async (event) => {
+    var _a, _b;
+    const beforeData = (_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data();
+    const afterData = (_b = event.data) === null || _b === void 0 ? void 0 : _b.after.data();
+    const companyId = (afterData === null || afterData === void 0 ? void 0 : afterData.companyId) || (beforeData === null || beforeData === void 0 ? void 0 : beforeData.companyId);
+    if (!companyId)
+        return;
+    const sizeBefore = calculateDocSize(beforeData);
+    const sizeAfter = calculateDocSize(afterData);
+    const sizeDiff = sizeAfter - sizeBefore;
+    if (sizeDiff !== 0) {
+        await db.collection('companies').doc(companyId).update({
+            usedStorage: admin.firestore.FieldValue.increment(sizeDiff)
+        });
+        console.log(`📊 Storage updated for ${companyId} (expenses): ${sizeDiff > 0 ? '+' : ''}${sizeDiff} bytes`);
+    }
+});
+/**
+ * Tracks storage usage for invoices
+ */
+exports.trackInvoiceStorage = (0, firestore_1.onDocumentWritten)({
+    document: 'invoices/{invoiceId}',
+    region: 'europe-west1'
+}, async (event) => {
+    var _a, _b;
+    const beforeData = (_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data();
+    const afterData = (_b = event.data) === null || _b === void 0 ? void 0 : _b.after.data();
+    const companyId = (afterData === null || afterData === void 0 ? void 0 : afterData.companyId) || (beforeData === null || beforeData === void 0 ? void 0 : beforeData.companyId);
+    if (!companyId)
+        return;
+    const sizeBefore = calculateDocSize(beforeData);
+    const sizeAfter = calculateDocSize(afterData);
+    const sizeDiff = sizeAfter - sizeBefore;
+    if (sizeDiff !== 0) {
+        await db.collection('companies').doc(companyId).update({
+            usedStorage: admin.firestore.FieldValue.increment(sizeDiff)
+        });
+        console.log(`📊 Storage updated for ${companyId} (invoices): ${sizeDiff > 0 ? '+' : ''}${sizeDiff} bytes`);
     }
 });
 //# sourceMappingURL=index.js.map
