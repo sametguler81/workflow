@@ -17,6 +17,8 @@ import {
 
 import { createAnnouncement } from './announcementService';
 import { notifyRolesInCompany, sendPushNotification } from './notificationService';
+import { getCompany } from './companyService';
+import { PLAN_DETAILS } from '../constants/plans';
 
 const db = getFirestore();
 
@@ -73,6 +75,31 @@ export const DOCUMENT_TYPE_ICONS: Record<DocumentType, string> = {
 export async function createInvoice(
     data: Omit<Invoice, 'id' | 'status' | 'createdAt'>
 ): Promise<string> {
+    // ─── Storage Limit Check ─────────────────────────────
+    const company = await getCompany(data.companyId);
+    if (!company) throw new Error('Firma bilgisi bulunamadı.');
+
+    const currentPlan = PLAN_DETAILS[company.plan || 'free'];
+    const limitBytes = currentPlan.storageLimit;
+
+    // -1 means unlimited
+    if (limitBytes !== -1) {
+        const currentUsage = company.usedStorage || 0;
+        let estimatedNewSize = JSON.stringify(data).length;
+        if (data.imageBase64) {
+            estimatedNewSize += Math.round((data.imageBase64.length * 3) / 4);
+        }
+
+        if (currentUsage + estimatedNewSize > limitBytes) {
+            throw new Error(`Paketinizin depolama limiti dolmuştur (${(limitBytes / (1024 * 1024 * 1024)).toFixed(0)} GB). Lütfen paketinizi yükseltin.`);
+        }
+    }
+    // ⚠️ GÜVENLİK VE PERFORMANS UYARISI:
+    // Base64 resimlerin (özellikle fatura/belge gibi yüksek çözünürlüklü) doğrudan Firestore dokümanlarında saklanması,
+    // (a) 1MB doküman boyutu sınırına ulaşılmasına,
+    // (b) Yüksek okuma maliyetlerine ve performans sorunlarına yol açabilir.
+    // İleriki aşamalarda resimlerin Firebase Storage'a yüklenip, 
+    // Firestore'da sadece URL'lerinin tutulması önerilir.
     const ref = await addDoc(collection(db, 'invoices'), {
         ...data,
         status: 'pending',

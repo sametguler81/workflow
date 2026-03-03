@@ -1,0 +1,302 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ─── Yardımcı Fonksiyonlar ─────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isSuperAdmin() {
+      return isSignedIn() && getUserData().role == 'superadmin';
+    }
+    
+    function isCompanyAdmin(companyId) {
+      return isSignedIn() && getUserData().companyId == companyId && 
+             getUserData().role in ['admin', 'idari'];
+    }
+    
+    function isCompanyMember(companyId) {
+      return isSignedIn() && getUserData().companyId == companyId;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ─── Firma Dokümanları ─────────────────────────────────
+    match /companies/{companyId} {
+      // Kendi firmasını ve SuperAdmin her firmayı okuyabilir
+      allow read: if isSignedIn() && (isCompanyMember(companyId) || isSuperAdmin());
+      
+      // Sadece SuperAdmin oluşturabilir
+      allow create: if isSuperAdmin();
+      
+      // SuperAdmin her şeyi güncelleyebilir, admin plan/userLimit hariç güncelleyebilir
+      allow update: if isSuperAdmin() || (
+        isCompanyAdmin(companyId) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'plan', 'userLimit', 'subscriptionExpiresAt', 'billingPeriod',
+          'lastPaymentAt', 'lastReceiptValidation', 'subscriptionProductId',
+          'subscriptionPlatform', 'subscriptionExpired', 'expiredAt',
+          'usedStorage'
+        ])
+      );
+      
+      allow delete: if isSuperAdmin();
+    }
+
+    // ─── Kullanıcı Dokümanları ─────────────────────────────
+    match /users/{userId} {
+      // Aynı firmadaki kullanıcılar ve SuperAdmin okuyabilir
+      allow read: if isSignedIn() && (
+        isOwner(userId) || 
+        isSuperAdmin() ||
+        getUserData().companyId == resource.data.companyId
+      );
+      
+      // İlk kayıt
+      allow create: if isSignedIn() && (
+        isOwner(userId) || isSuperAdmin()
+      );
+      
+      // Kendi profilini güncelleyebilir ama role ve companyId değiştiremez
+      // Admin/SuperAdmin role değiştirebilir
+      allow update: if isSuperAdmin() || (
+        isOwner(userId) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId'])
+      ) || (
+        isCompanyAdmin(resource.data.companyId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['companyId']) &&
+        // Admin superadmin rolü veremez
+        request.resource.data.role != 'superadmin'
+      );
+      
+      allow delete: if isSuperAdmin();
+    }
+
+    // ─── İzin Talepleri ────────────────────────────────────
+    match /leaves/{leaveId} {
+      allow read: if isSignedIn() && (
+        isSuperAdmin() || isCompanyMember(resource.data.companyId)
+      );
+      
+      allow create: if isSignedIn() && (
+        isCompanyMember(request.resource.data.companyId) &&
+        request.resource.data.userId == request.auth.uid
+      );
+      
+      // Kendi talebini güncelleyebilir (pending iken) veya admin onaylayabilir
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        isCompanyAdmin(resource.data.companyId) ||
+        (isOwner(resource.data.userId) && resource.data.status == 'pending')
+      );
+      
+      allow delete: if isSignedIn() && (
+        isSuperAdmin() ||
+        isCompanyAdmin(resource.data.companyId) ||
+        (isOwner(resource.data.userId) && resource.data.status == 'pending')
+      );
+    }
+
+    // ─── Masraf / Fişler ───────────────────────────────────
+    match /expenses/{expenseId} {
+      allow read: if isSignedIn() && (
+        isSuperAdmin() || isCompanyMember(resource.data.companyId)
+      );
+      
+      allow create: if isSignedIn() && (
+        isCompanyMember(request.resource.data.companyId) &&
+        request.resource.data.userId == request.auth.uid
+      );
+      
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        isCompanyAdmin(resource.data.companyId) ||
+        // Muhasebe de güncelleyebilir
+        (isCompanyMember(resource.data.companyId) && getUserData().role == 'muhasebe') ||
+        (isOwner(resource.data.userId) && resource.data.status == 'pending')
+      );
+      
+      allow delete: if isSignedIn() && (
+        isSuperAdmin() ||
+        isCompanyAdmin(resource.data.companyId) ||
+        (isOwner(resource.data.userId) && resource.data.status == 'pending')
+      );
+    }
+
+    // ─── Faturalar / Belgeler ──────────────────────────────
+    match /invoices/{invoiceId} {
+      allow read: if isSignedIn() && (
+        isSuperAdmin() || isCompanyMember(resource.data.companyId)
+      );
+      
+      allow create: if isSignedIn() && (
+        isCompanyMember(request.resource.data.companyId) &&
+        request.resource.data.userId == request.auth.uid
+      );
+      
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        isCompanyAdmin(resource.data.companyId) ||
+        (isCompanyMember(resource.data.companyId) && getUserData().role == 'muhasebe') ||
+        (isOwner(resource.data.userId) && resource.data.status == 'pending')
+      );
+      
+      allow delete: if isSignedIn() && (
+        isSuperAdmin() ||
+        isCompanyAdmin(resource.data.companyId) ||
+        (isOwner(resource.data.userId) && resource.data.status == 'pending')
+      );
+    }
+
+    // ─── Yoklama Kayıtları ─────────────────────────────────
+    match /attendance/{recordId} {
+      allow read: if isSignedIn() && (
+        isSuperAdmin() || isCompanyMember(resource.data.companyId)
+      );
+      
+      // Sadece kendi yoklamasını kaydedebilir
+      allow create: if isSignedIn() && (
+        isCompanyMember(request.resource.data.companyId) &&
+        request.resource.data.userId == request.auth.uid
+      );
+      
+      allow update, delete: if isSuperAdmin() || isCompanyAdmin(resource.data.companyId);
+    }
+
+    // ─── Yoklama QR Kodları ────────────────────────────────
+    match /attendanceQR/{qrId} {
+      allow read: if isSignedIn() && (
+        isSuperAdmin() || isCompanyMember(resource.data.companyId)
+      );
+      
+      // Sadece admin/idari QR oluşturabilir
+      allow create: if isSignedIn() && (
+        isCompanyAdmin(request.resource.data.companyId)
+      );
+      
+      allow update, delete: if isSuperAdmin() || isCompanyAdmin(resource.data.companyId);
+    }
+
+    // ─── Duyurular ─────────────────────────────────────────
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn() && (
+        isSuperAdmin() || isCompanyMember(resource.data.companyId)
+      );
+      
+      // Firma üyeleri duyuru oluşturabilir (bildirim sistemi için)
+      allow create: if isSignedIn() && (
+        isCompanyMember(request.resource.data.companyId)
+      );
+      
+      // readBy ve dismissedBy güncelleme + admin tam güncelleme
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        isCompanyAdmin(resource.data.companyId) ||
+        // Normal kullanıcılar sadece readBy/dismissedBy güncelleyebilir
+        (isCompanyMember(resource.data.companyId) && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy', 'dismissedBy']))
+      );
+      
+      allow delete: if isSuperAdmin() || isCompanyAdmin(resource.data.companyId);
+    }
+
+    // ─── Envanter Öğeleri ──────────────────────────────────
+    match /inventoryItems/{itemId} {
+      allow read: if isSignedIn() && (
+        isSuperAdmin() || isCompanyMember(resource.data.companyId)
+      );
+      
+      allow create: if isSignedIn() && (
+        isCompanyAdmin(request.resource.data.companyId)
+      );
+      
+      allow update: if isSignedIn() && (
+        isSuperAdmin() || isCompanyAdmin(resource.data.companyId)
+      );
+      
+      allow delete: if isSuperAdmin() || isCompanyAdmin(resource.data.companyId);
+    }
+
+    // ─── Zimmet Kayıtları ──────────────────────────────────
+    match /assignments/{assignmentId} {
+      allow read: if isSignedIn() && (
+        isSuperAdmin() || isCompanyMember(resource.data.companyId)
+      );
+      
+      allow create: if isSignedIn() && (
+        isCompanyAdmin(request.resource.data.companyId)
+      );
+      
+      allow update: if isSignedIn() && (
+        isSuperAdmin() || isCompanyAdmin(resource.data.companyId)
+      );
+      
+      allow delete: if isSuperAdmin() || isCompanyAdmin(resource.data.companyId);
+    }
+
+    // ─── Davetler ──────────────────────────────────────────
+    match /invitations/{invitationId} {
+      allow read: if isSignedIn();
+      
+      allow create: if isSignedIn() && (
+        isCompanyAdmin(request.resource.data.companyId)
+      );
+      
+      allow update, delete: if isSignedIn() && (
+        isSuperAdmin() || isCompanyAdmin(resource.data.companyId)
+      );
+    }
+
+    // ─── Abonelik Logları ──────────────────────────────────
+    // Sadece Cloud Functions yazabilir (admin SDK), client okuyabilir
+    match /subscriptionLogs/{logId} {
+      allow read: if isSuperAdmin();
+      allow write: if false; // Sadece Admin SDK (Cloud Functions) yazabilir
+    }
+
+    // ─── Dokümanlar (Belge Yönetimi) ───────────────────────
+    match /documents/{docId} {
+      allow read: if isSignedIn() && (
+        isSuperAdmin() || isCompanyMember(resource.data.companyId)
+      );
+      
+      allow create: if isSignedIn() && (
+        isCompanyMember(request.resource.data.companyId)
+      );
+      
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        isCompanyAdmin(resource.data.companyId) ||
+        isOwner(resource.data.userId)
+      );
+      
+      allow delete: if isSignedIn() && (
+        isSuperAdmin() ||
+        isCompanyAdmin(resource.data.companyId) ||
+        isOwner(resource.data.userId)
+      );
+    }
+
+    // ─── Takvim Etkinlikleri ───────────────────────────────
+    match /calendarEvents/{eventId} {
+      allow read: if isSignedIn() && (
+        isSuperAdmin() || isCompanyMember(resource.data.companyId)
+      );
+      
+      allow create: if isSignedIn() && (
+        isCompanyAdmin(request.resource.data.companyId)
+      );
+      
+      allow update, delete: if isSignedIn() && (
+        isSuperAdmin() || isCompanyAdmin(resource.data.companyId)
+      );
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,6 +8,7 @@ import {
     Alert,
     ActivityIndicator,
     Dimensions,
+    Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,12 +16,31 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../theme/ThemeContext';
 import { Colors, Spacing, BorderRadius, Shadows } from '../../theme/theme';
 import { getCompany, Company } from '../../services/companyService';
+import {
+    validateReceipt,
+    getProductId,
+    getPlanFromProductId,
+    ALL_SUBSCRIPTION_SKUS,
+} from '../../services/iapService';
+import { IAP_ENABLED } from '../../config/iapConfig';
+
+// expo-iap — sadece IAP_ENABLED true olduğunda yüklenir
+let useIAP: any = null;
+if (IAP_ENABLED) {
+    try {
+        useIAP = require('expo-iap').useIAP;
+    } catch (e) {
+        console.log('[IAP] expo-iap modülü yüklenemedi');
+    }
+}
 
 const { width } = Dimensions.get('window');
 
 interface SubscriptionScreenProps {
     onBack: () => void;
 }
+
+type BillingPeriod = 'monthly' | 'yearly';
 
 const PLAN_ORDER = ['free', 'pro', 'enterprise'];
 
@@ -29,41 +49,44 @@ const PLANS = [
         id: 'free',
         name: 'Başlangıç',
         tag: 'FREE',
-        price: '₺0',
-        period: 'Sonsuza dek',
+        monthlyPrice: 0,
+        yearlyPrice: 0,
         userLimit: '5 Kullanıcı',
         storage: '5 GB Depolama',
         support: 'Temel E-posta Destek',
         features: ['İzin Yönetimi', 'Fiş/Fatura Yükleme', 'Temel Raporlar', 'QR Yoklama', 'Zimmet Yönetimi', 'Duyuru Sistemi'],
         missing: ['Özel Raporlar', 'AI Raporlama ve Destek', 'Geliştirilebilir Raporlar'],
         accent: '#64748B',
+        gradient: ['#64748B', '#475569'] as const,
     },
     {
         id: 'pro',
         name: 'Profesyonel',
         tag: 'PRO',
-        price: '₺499',
-        period: 'Aylık',
+        monthlyPrice: 499,
+        yearlyPrice: 4499,
         userLimit: '20 Kullanıcı',
         storage: '20 GB Depolama',
         support: '7/24 Öncelikli Destek',
         features: ['İzin Yönetimi', 'Fiş/Fatura Yükleme', 'Özel Raporlar', 'QR Yoklama', 'Zimmet Yönetimi', 'Duyuru Sistemi'],
         missing: ['AI Raporlama ve Destek', 'Geliştirilebilir Raporlar'],
         accent: '#1E40AF',
+        gradient: ['#1E3A8A', '#2563EB'] as const,
         recommended: true,
     },
     {
         id: 'enterprise',
         name: 'Kurumsal',
         tag: 'ENTERPRISE',
-        price: 'Özel Fiyat',
-        period: 'Teklif Alın',
+        monthlyPrice: 999,
+        yearlyPrice: 8999,
         userLimit: 'Sınırsız Kullanıcı',
         storage: 'Sınırsız Depolama',
         support: 'Özel Müşteri Temsilcisi',
         features: ['İzin Yönetimi', 'AI Raporlama ve Destek', 'Fiş/Fatura Yükleme', 'Geliştirilebilir Raporlar', 'QR Yoklama', 'Zimmet Yönetimi', 'Duyuru Sistemi'],
         missing: [],
-        accent: '#1A1A2E',
+        accent: '#7C3AED',
+        gradient: ['#5B21B6', '#7C3AED'] as const,
     },
 ];
 
@@ -74,12 +97,96 @@ const TRUST_ITEMS = [
     { icon: 'refresh-outline', label: '99.9% SLA' },
 ];
 
+function formatPrice(price: number): string {
+    if (price === 0) return '₺0';
+    return `₺${price.toLocaleString('tr-TR')}`;
+}
+
+function calculateSavings(monthly: number, yearly: number): number {
+    if (monthly === 0) return 0;
+    const totalMonthly = monthly * 12;
+    return Math.round(((totalMonthly - yearly) / totalMonthly) * 100);
+}
+
+function formatSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 export function SubscriptionScreen({ onBack }: SubscriptionScreenProps) {
     const { profile } = useAuth();
     const { colors, isDark } = useTheme();
     const [company, setCompany] = useState<Company | null>(null);
     const [loading, setLoading] = useState(true);
+    const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('monthly');
+    const [purchasing, setPurchasing] = useState(false);
+    const [restoring, setRestoring] = useState(false);
+    const [iapAvailable, setIapAvailable] = useState(false);
 
+    // ── expo-iap hook ──
+    // useIAP null olabilir (modül yüklenemediğinde)
+    const iapResult = useIAP ? useIAP({
+        onPurchaseSuccess: async (purchase: any) => {
+            try {
+                const receipt = Platform.OS === 'ios'
+                    ? purchase.transactionReceipt
+                    : purchase.purchaseToken;
+
+                if (!receipt || !profile?.companyId) {
+                    throw new Error('Receipt veya firma bilgisi bulunamadı');
+                }
+
+                const productId = purchase.productId || '';
+                const result = await validateReceipt(
+                    receipt,
+                    productId,
+                    Platform.OS as 'ios' | 'android',
+                );
+
+                if (result.valid) {
+                    await iapResult?.finishTransaction?.({ purchase, isConsumable: false });
+                    const updated = await getCompany(profile.companyId);
+                    setCompany(updated);
+
+                    Alert.alert(
+                        'Başarılı! 🎉',
+                        `Planınız ${result.plan === 'pro' ? 'Profesyonel' : 'Kurumsal'} olarak güncellendi.`,
+                        [{ text: 'Tamam' }],
+                    );
+                } else {
+                    Alert.alert('Hata', result.error || 'Ödeme doğrulanamadı.');
+                }
+            } catch (error: any) {
+                console.error('Purchase completion error:', error);
+                Alert.alert('Hata', 'Satın alma tamamlanamadı.');
+            } finally {
+                setPurchasing(false);
+            }
+        },
+        onPurchaseError: (error: any) => {
+            console.error('Purchase error:', error);
+            setPurchasing(false);
+            if (error.message?.includes('cancel') || error.message?.includes('E_USER_CANCELLED')) return;
+            Alert.alert('Hata', 'Satın alma işlemi başarısız oldu.');
+        },
+    }) : null;
+
+    // ── Store bağlantı durumunu takip et ──
+    useEffect(() => {
+        if (iapResult?.connected) {
+            setIapAvailable(true);
+            try {
+                iapResult.fetchProducts?.({ skus: ALL_SUBSCRIPTION_SKUS, type: 'subs' });
+            } catch (e) {
+                console.log('[IAP] Ürünler yüklenemedi:', e);
+            }
+        }
+    }, [iapResult?.connected]);
+
+    // ── Firma bilgisini yükle ──
     useEffect(() => {
         const load = async () => {
             if (profile?.companyId) {
@@ -91,16 +198,100 @@ export function SubscriptionScreen({ onBack }: SubscriptionScreenProps) {
         load();
     }, [profile]);
 
-    const handleUpgrade = (planName: string) => {
-        Alert.alert(
-            'Yükseltme Talebi Alındı',
-            `${planName} paketi için talebiniz iletildi. Temsilcimiz en kısa sürede sizinle iletişime geçecektir.`,
-            [{ text: 'Tamam', style: 'default' }],
-        );
-    };
+    // ── Satın alma başlat ──
+    const handleUpgrade = useCallback(async (planId: 'pro' | 'enterprise') => {
+        if (!iapAvailable || !iapResult?.requestPurchase) {
+            Alert.alert(
+                'Mağaza Bağlantısı Yok',
+                'Ödeme sistemi şu an kullanılamıyor. Lütfen daha sonra tekrar deneyin.',
+            );
+            return;
+        }
+
+        const productId = getProductId(planId, billingPeriod);
+        setPurchasing(true);
+
+        try {
+            await iapResult.requestPurchase({
+                request: {
+                    apple: { sku: productId },
+                    google: { skus: [productId] },
+                },
+                type: 'subs',
+            });
+        } catch (error: any) {
+            setPurchasing(false);
+            console.error('Purchase request error:', error);
+        }
+    }, [iapAvailable, iapResult, billingPeriod]);
+
+    // ── Satın almaları geri yükle ──
+    const handleRestore = useCallback(async () => {
+        if (!iapAvailable || !iapResult?.getAvailablePurchases) {
+            Alert.alert('Bağlantı Hatası', 'Mağaza bağlantısı kurulamadı.');
+            return;
+        }
+
+        setRestoring(true);
+        try {
+            const purchases = await iapResult.getAvailablePurchases();
+
+            if (purchases && Array.isArray(purchases) && purchases.length > 0) {
+                const latest = purchases[purchases.length - 1];
+                const receipt = Platform.OS === 'ios'
+                    ? (latest as any).transactionReceipt
+                    : (latest as any).purchaseToken;
+
+                if (receipt && profile?.companyId) {
+                    const result = await validateReceipt(
+                        receipt,
+                        latest.productId || '',
+                        Platform.OS as 'ios' | 'android',
+                    );
+
+                    if (result.valid) {
+                        const updated = await getCompany(profile.companyId);
+                        setCompany(updated);
+                        Alert.alert('Başarılı', 'Aboneliğiniz geri yüklendi.');
+                    } else {
+                        Alert.alert('Bilgi', 'Aktif bir abonelik bulunamadı.');
+                    }
+                }
+            } else {
+                Alert.alert('Bilgi', 'Geri yüklenecek bir satın alma bulunamadı.');
+            }
+        } catch (error) {
+            console.error('Restore error:', error);
+            Alert.alert('Hata', 'Satın almalar geri yüklenemedi.');
+        } finally {
+            setRestoring(false);
+        }
+    }, [iapAvailable, iapResult, profile]);
 
     const currentPlanId = company?.plan || 'free';
     const currentPlan = PLANS.find(p => p.id === currentPlanId) || PLANS[0];
+
+    // Calculate storage limit logic
+    const usedStorage = company?.usedStorage || 0;
+    const isEnterprise = currentPlan.id === 'enterprise';
+
+    // Limit is defined in plans.ts dynamically, so we map it here:
+    // free: 5GB, pro: 20GB, enterprise: unlimited
+    const storageLimitBytes = isEnterprise
+        ? -1
+        : currentPlan.id === 'pro'
+            ? 20 * 1024 * 1024 * 1024
+            : 5 * 1024 * 1024 * 1024;
+
+    const storagePercentage = isEnterprise
+        ? 0
+        : Math.min((usedStorage / storageLimitBytes) * 100, 100);
+
+    const storageColor = storagePercentage > 90
+        ? Colors.danger
+        : storagePercentage > 75
+            ? Colors.warning
+            : Colors.primary;
 
     if (loading) {
         return (
@@ -149,6 +340,43 @@ export function SubscriptionScreen({ onBack }: SubscriptionScreenProps) {
                     </View>
                 </LinearGradient>
 
+                {/* ── Storage Usage Card ── */}
+                <View style={[styles.storageCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+                    <View style={styles.storageHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Ionicons name="cloud-outline" size={18} color={Colors.primary} />
+                            <Text style={[styles.storageTitle, { color: colors.text }]}>Depolama Alanı</Text>
+                        </View>
+                        <Text style={[styles.storageValue, { color: colors.textSecondary }]}>
+                            {formatSize(usedStorage)} / {isEnterprise ? 'Sınırsız' : formatSize(storageLimitBytes)}
+                        </Text>
+                    </View>
+
+                    <View style={[styles.progressBarContainer, { backgroundColor: colors.borderLight }]}>
+                        {!isEnterprise ? (
+                            <View
+                                style={[
+                                    styles.progressBarFill,
+                                    { width: `${storagePercentage}%`, backgroundColor: storageColor }
+                                ]}
+                            />
+                        ) : (
+                            <LinearGradient
+                                colors={['#7C3AED', '#3B82F6', '#10B981']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={[styles.progressBarFill, { width: '100%' }]}
+                            />
+                        )}
+                    </View>
+
+                    {!isEnterprise && storagePercentage > 85 && (
+                        <Text style={[styles.storageWarning, { color: storageColor }]}>
+                            Depolama alanınız dolmak üzere. ({storagePercentage.toFixed(1)}%)
+                        </Text>
+                    )}
+                </View>
+
                 {/* ── Trust Row ── */}
                 <View style={[styles.trustRow, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
                     {TRUST_ITEMS.map((item) => (
@@ -157,6 +385,46 @@ export function SubscriptionScreen({ onBack }: SubscriptionScreenProps) {
                             <Text style={[styles.trustLabel, { color: colors.textSecondary }]}>{item.label}</Text>
                         </View>
                     ))}
+                </View>
+
+                {/* ── Billing Period Toggle ── */}
+                <View style={[styles.billingToggleContainer, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+                    <View style={[styles.billingToggle, { backgroundColor: isDark ? colors.surfaceVariant : '#F1F5F9' }]}>
+                        <TouchableOpacity
+                            style={[
+                                styles.billingOption,
+                                billingPeriod === 'monthly' && styles.billingOptionActive,
+                            ]}
+                            onPress={() => setBillingPeriod('monthly')}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[
+                                styles.billingOptionText,
+                                { color: billingPeriod === 'monthly' ? '#FFF' : colors.textSecondary },
+                            ]}>
+                                Aylık
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.billingOption,
+                                billingPeriod === 'yearly' && styles.billingOptionActive,
+                            ]}
+                            onPress={() => setBillingPeriod('yearly')}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[
+                                styles.billingOptionText,
+                                { color: billingPeriod === 'yearly' ? '#FFF' : colors.textSecondary },
+                            ]}>
+                                Yıllık
+                            </Text>
+                            <View style={styles.savingsBadge}>
+                                <Text style={styles.savingsBadgeText}>Tasarruf</Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* ── Section Label ── */}
@@ -169,6 +437,10 @@ export function SubscriptionScreen({ onBack }: SubscriptionScreenProps) {
                 {PLANS.map((plan) => {
                     const isCurrent = currentPlanId === plan.id;
                     const isUpgrade = PLAN_ORDER.indexOf(plan.id) > PLAN_ORDER.indexOf(currentPlanId);
+                    const price = billingPeriod === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice;
+                    const savings = calculateSavings(plan.monthlyPrice, plan.yearlyPrice);
+                    const isFree = plan.monthlyPrice === 0;
+                    const periodLabel = isFree ? 'Sonsuza dek' : billingPeriod === 'monthly' ? '/ ay' : '/ yıl';
 
                     return (
                         <View
@@ -181,10 +453,15 @@ export function SubscriptionScreen({ onBack }: SubscriptionScreenProps) {
                         >
                             {/* Recommended Banner */}
                             {plan.recommended && (
-                                <View style={[styles.recommendedBar, { backgroundColor: Colors.primary }]}>
+                                <LinearGradient
+                                    colors={plan.gradient}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.recommendedBar}
+                                >
                                     <Ionicons name="star" size={11} color="#FFF" />
                                     <Text style={styles.recommendedBarText}>KURUMSAL KULLANICILARIN TERCİHİ</Text>
-                                </View>
+                                </LinearGradient>
                             )}
 
                             {/* Card Header */}
@@ -193,8 +470,27 @@ export function SubscriptionScreen({ onBack }: SubscriptionScreenProps) {
                                     <Text style={[styles.planTag, { color: plan.accent }]}>{plan.tag}</Text>
                                 </View>
                                 <View style={styles.priceBlock}>
-                                    <Text style={[styles.price, { color: plan.accent }]}>{plan.price}</Text>
-                                    <Text style={[styles.pricePeriod, { color: colors.textTertiary }]}>{plan.period}</Text>
+                                    <View style={styles.priceRow}>
+                                        <Text style={[styles.price, { color: plan.accent }]}>
+                                            {isFree ? '₺0' : formatPrice(price)}
+                                        </Text>
+                                        <Text style={[styles.pricePeriod, { color: colors.textTertiary }]}>{periodLabel}</Text>
+                                    </View>
+                                    {/* Yearly savings */}
+                                    {billingPeriod === 'yearly' && savings > 0 && !isFree && (
+                                        <View style={[styles.yearlySavingsBadge, { backgroundColor: Colors.success + '15' }]}>
+                                            <Ionicons name="trending-down" size={12} color={Colors.success} />
+                                            <Text style={[styles.yearlySavingsText, { color: Colors.success }]}>
+                                                %{savings} tasarruf
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {/* Monthly equivalent for yearly */}
+                                    {billingPeriod === 'yearly' && !isFree && (
+                                        <Text style={[styles.monthlyEquivalent, { color: colors.textTertiary }]}>
+                                            aylık ~{formatPrice(Math.round(price / 12))}
+                                        </Text>
+                                    )}
                                 </View>
                             </View>
 
@@ -222,13 +518,13 @@ export function SubscriptionScreen({ onBack }: SubscriptionScreenProps) {
                             <View style={styles.featureSection}>
                                 {plan.features.map((f, i) => (
                                     <View key={i} style={styles.featureRow}>
-                                        <View style={[styles.featureDot, { backgroundColor: plan.accent }]} />
+                                        <Ionicons name="checkmark-circle" size={16} color={plan.accent} />
                                         <Text style={[styles.featureText, { color: colors.textSecondary }]}>{f}</Text>
                                     </View>
                                 ))}
                                 {plan.missing.map((f, i) => (
                                     <View key={i} style={styles.featureRow}>
-                                        <View style={[styles.featureDot, { backgroundColor: colors.borderLight }]} />
+                                        <Ionicons name="close-circle" size={16} color={colors.borderLight} />
                                         <Text style={[styles.featureText, { color: colors.textTertiary }, styles.strikeText]}>{f}</Text>
                                     </View>
                                 ))}
@@ -241,17 +537,25 @@ export function SubscriptionScreen({ onBack }: SubscriptionScreenProps) {
                                     <Text style={[styles.activeBtnText, { color: plan.accent }]}>Mevcut Planınız</Text>
                                 </View>
                             ) : isUpgrade ? (
-                                <TouchableOpacity onPress={() => handleUpgrade(plan.name)} activeOpacity={0.85}>
+                                <TouchableOpacity
+                                    onPress={() => handleUpgrade(plan.id as 'pro' | 'enterprise')}
+                                    activeOpacity={0.85}
+                                    disabled={purchasing}
+                                >
                                     <LinearGradient
-                                        colors={plan.id === 'pro' ? ['#1E3A8A', '#2563EB'] : ['#0F172A', '#1E293B']}
+                                        colors={plan.gradient}
                                         start={{ x: 0, y: 0 }}
                                         end={{ x: 1, y: 0 }}
-                                        style={styles.upgradeBtn}
+                                        style={[styles.upgradeBtn, purchasing && { opacity: 0.7 }]}
                                     >
-                                        <Text style={styles.upgradeBtnText}>
-                                            {plan.id === 'enterprise' ? 'Teklif Talep Et' : 'Yükselt'}
-                                        </Text>
-                                        <Ionicons name="arrow-forward" size={16} color="#FFF" />
+                                        {purchasing ? (
+                                            <ActivityIndicator size="small" color="#FFF" />
+                                        ) : (
+                                            <>
+                                                <Text style={styles.upgradeBtnText}>Satın Al</Text>
+                                                <Ionicons name="card-outline" size={16} color="#FFF" />
+                                            </>
+                                        )}
                                     </LinearGradient>
                                 </TouchableOpacity>
                             ) : (
@@ -263,11 +567,28 @@ export function SubscriptionScreen({ onBack }: SubscriptionScreenProps) {
                     );
                 })}
 
+                {/* ── Restore Purchases ── */}
+                <TouchableOpacity
+                    style={[styles.restoreBtn, { borderColor: colors.borderLight }]}
+                    onPress={handleRestore}
+                    disabled={restoring}
+                    activeOpacity={0.7}
+                >
+                    {restoring ? (
+                        <ActivityIndicator size="small" color={Colors.primary} />
+                    ) : (
+                        <>
+                            <Ionicons name="refresh-outline" size={18} color={Colors.primary} />
+                            <Text style={[styles.restoreBtnText, { color: Colors.primary }]}>Satın Almaları Geri Yükle</Text>
+                        </>
+                    )}
+                </TouchableOpacity>
+
                 {/* ── Footer Note ── */}
                 <View style={[styles.footerNote, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
                     <Ionicons name="information-circle-outline" size={20} color={colors.textTertiary} />
                     <Text style={[styles.footerNoteText, { color: colors.textTertiary }]}>
-                        Yükseltme talepleriniz WorkFlow360 ekibi tarafından en kısa sürede değerlendirilecektir. Plan değişikliklerinde mevcut verilere erişim kesintisiz devam eder.
+                        Ödeme işlemleri {Platform.OS === 'ios' ? 'Apple App Store' : 'Google Play Store'} üzerinden güvenle gerçekleştirilir. Abonelikler otomatik olarak yenilenir ve istediğiniz zaman iptal edebilirsiniz.
                     </Text>
                 </View>
 
@@ -319,7 +640,6 @@ const styles = StyleSheet.create({
     planPillText: { color: '#FFF', fontSize: 12, fontWeight: '800' },
     bannerSince: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
 
-    // Trust Row
     trustRow: {
         flexDirection: 'row',
         justifyContent: 'space-around',
@@ -327,10 +647,81 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         paddingVertical: 14,
         paddingHorizontal: 8,
-        marginBottom: 24,
+        marginBottom: 16,
     },
     trustItem: { alignItems: 'center', gap: 5 },
     trustLabel: { fontSize: 10, fontWeight: '600', textAlign: 'center' },
+
+    // Storage Usage
+    storageCard: {
+        borderRadius: 16,
+        borderWidth: 1,
+        padding: 16,
+        marginBottom: 20,
+    },
+    storageHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    storageTitle: { fontSize: 14, fontWeight: '700' },
+    storageValue: { fontSize: 13, fontWeight: '600' },
+    progressBarContainer: {
+        height: 8,
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    progressBarFill: {
+        height: '100%',
+        borderRadius: 4,
+    },
+    storageWarning: {
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 8,
+    },
+
+    // Billing Period Toggle
+    billingToggleContainer: {
+        borderRadius: 16,
+        borderWidth: 1,
+        padding: 14,
+        marginBottom: 20,
+    },
+    billingToggle: {
+        flexDirection: 'row',
+        borderRadius: 12,
+        padding: 4,
+    },
+    billingOption: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 10,
+        gap: 6,
+    },
+    billingOptionActive: {
+        backgroundColor: Colors.primary,
+        ...Shadows.small,
+    },
+    billingOptionText: {
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    savingsBadge: {
+        backgroundColor: Colors.success,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 6,
+    },
+    savingsBadgeText: {
+        color: '#FFF',
+        fontSize: 10,
+        fontWeight: '800',
+    },
 
     // Section Header
     sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
@@ -357,15 +748,27 @@ const styles = StyleSheet.create({
     cardHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         padding: 20,
         paddingBottom: 0,
     },
     planTagBadge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
     planTag: { fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
     priceBlock: { alignItems: 'flex-end' },
-    price: { fontSize: 22, fontWeight: '900' },
-    pricePeriod: { fontSize: 11, fontWeight: '600', marginTop: 1 },
+    priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+    price: { fontSize: 24, fontWeight: '900' },
+    pricePeriod: { fontSize: 12, fontWeight: '600' },
+    yearlySavingsBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+        marginTop: 6,
+    },
+    yearlySavingsText: { fontSize: 11, fontWeight: '700' },
+    monthlyEquivalent: { fontSize: 11, fontWeight: '500', marginTop: 2 },
     planName: { fontSize: 18, fontWeight: '800', paddingHorizontal: 20, marginTop: 6, marginBottom: 14 },
 
     // Stats Row
@@ -384,7 +787,6 @@ const styles = StyleSheet.create({
     // Features
     featureSection: { paddingHorizontal: 20, marginBottom: 16 },
     featureRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 9 },
-    featureDot: { width: 7, height: 7, borderRadius: 4 },
     featureText: { fontSize: 13, fontWeight: '500' },
     strikeText: { textDecorationLine: 'line-through', opacity: 0.5 },
 
@@ -424,4 +826,20 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     footerNoteText: { flex: 1, fontSize: 12, lineHeight: 18 },
+    restoreBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        marginHorizontal: 20,
+        marginBottom: 20,
+        paddingVertical: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+    },
+    restoreBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
 });

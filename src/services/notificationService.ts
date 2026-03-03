@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { getFirestore, doc, updateDoc, collection, query, where, getDocs } from '@react-native-firebase/firestore';
+import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
 
 const db = getFirestore();
 
@@ -71,28 +72,23 @@ export async function saveUserPushToken(uid: string, token: string | null) {
 }
 
 /**
- * Belirli kullanıcılara Push Bildirimi Gönderir
+ * Push Bildirimi Gönderir — Cloud Function Üzerinden
+ * 
+ * ✅ Güvenlik: Bildirimler artık sunucu tarafından gönderilir.
+ * Client sadece hedef token'ları ve mesaj içeriğini Cloud Function'a iletir.
  */
 export async function sendPushNotification(expoPushToken: string, title: string, body: string, data?: any) {
     if (!expoPushToken) return;
 
-    const message = {
-        to: expoPushToken,
-        sound: 'default',
-        title,
-        body,
-        data: data || {},
-    };
-
     try {
-        await fetch('https://exp.host/--/api/v2/push/send', {
-            method: 'POST',
-            headers: {
-                Accept: 'application/json',
-                'Accept-encoding': 'gzip, deflate',
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(message),
+        const functions = getFunctions();
+        const sendNotificationFn = httpsCallable(functions, 'sendNotification');
+
+        await sendNotificationFn({
+            targetTokens: [expoPushToken],
+            title,
+            body,
+            data: data || {},
         });
     } catch (error) {
         console.error('Push bildirimi gönderilemedi:', error);
@@ -101,6 +97,8 @@ export async function sendPushNotification(expoPushToken: string, title: string,
 
 /**
  * Gönderilen rollere sahip firma içi tüm kullanıcılara bildirim atar
+ * 
+ * ✅ Token'ları toplar ve Cloud Function'a tek seferde gönderir.
  */
 export async function notifyRolesInCompany(
     companyId: string,
@@ -117,15 +115,27 @@ export async function notifyRolesInCompany(
         );
         const usersSnap = await getDocs(q);
 
-        const pushPromises = usersSnap.docs.map((doc: any) => {
+        // Tüm token'ları topla
+        const tokens: string[] = [];
+        usersSnap.docs.forEach((doc: any) => {
             const userData = doc.data();
             if (userData.expoPushToken) {
-                return sendPushNotification(userData.expoPushToken, title, body, data);
+                tokens.push(userData.expoPushToken);
             }
-            return null;
         });
 
-        await Promise.all(pushPromises.filter((p: any) => p !== null));
+        if (tokens.length === 0) return;
+
+        // Cloud Function ile gönder
+        const functions = getFunctions();
+        const sendNotificationFn = httpsCallable(functions, 'sendNotification');
+
+        await sendNotificationFn({
+            targetTokens: tokens,
+            title,
+            body,
+            data: data || {},
+        });
     } catch (error) {
         console.error('Role göre bildirim gönderilirken hata:', error);
     }

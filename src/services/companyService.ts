@@ -19,6 +19,7 @@ export interface Company {
     ownerId: string;
     plan: 'free' | 'pro' | 'enterprise';
     userLimit: number;
+    usedStorage?: number;
     createdAt: string;
 }
 

@@ -131,48 +131,73 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
 
     const parseAmountFromText = (text: string): string | null => {
         const lines = text.split('\n');
-        let bestAmount: string | null = null;
+        let maxFound = 0;
 
-        // Look for TOPLAM / TOTAL / GENEL TOPLAM lines first
-        for (const line of lines) {
-            const upper = line.toUpperCase();
-            if (upper.includes('TOPLAM') || upper.includes('TOTAL') || upper.includes('GENEL')) {
-                // Match amounts like 350,75 or 350.75 or *350,75 or ₺350.75
-                const amountMatch = line.match(/[*₺]?\s*(\d{1,6}[.,]\d{2})/);
-                if (amountMatch) {
-                    bestAmount = amountMatch[1].replace(',', '.');
+        // Step 1: Specifically look for Total/Tutar/Top/Ödenen cues.
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].toUpperCase();
+            if (line.includes('TOPLAM') || line.includes('TUTAR') || line.includes('GENEL') || line.includes('ODENEN') || line.includes('ÖDENEN')) {
+                // Match amount on the exact same line
+                const match = line.match(/[*₺]?\s*(\d{1,3}(?:[.,]\d{3})*[.,]\d{2}|\d{1,6}[.,]\d{2})/);
+                if (match) {
+                    const clean = match[1].replace(/[.,](?=\d{3})/g, '').replace(',', '.');
+                    const num = parseFloat(clean);
+                    if (!isNaN(num) && num > maxFound) maxFound = num;
                 }
-            }
-        }
 
-        // Fallback: find the largest number with decimals in the text
-        if (!bestAmount) {
-            const allAmounts = text.match(/(\d{1,6}[.,]\d{2})/g);
-            if (allAmounts && allAmounts.length > 0) {
-                let max = 0;
-                for (const a of allAmounts) {
-                    const num = parseFloat(a.replace(',', '.'));
-                    if (num > max) {
-                        max = num;
-                        bestAmount = a.replace(',', '.');
+                // ML Kit often puts the amount on the next 1-2 bounding box lines
+                for (let j = 1; j <= 2; j++) {
+                    if (i + j < lines.length) {
+                        const nextMatch = lines[i + j].match(/[*₺]?\s*(\d{1,3}(?:[.,]\d{3})*[.,]\d{2}|\d{1,6}[.,]\d{2})/);
+                        if (nextMatch) {
+                            const clean = nextMatch[1].replace(/[.,](?=\d{3})/g, '').replace(',', '.');
+                            const num = parseFloat(clean);
+                            if (!isNaN(num) && num > maxFound) maxFound = num;
+                        }
                     }
                 }
             }
         }
 
-        return bestAmount;
+        // Step 2: Fallback: no keywords matched? Pick the absolute biggest monetary value on the receipt (usually total)
+        if (maxFound === 0) {
+            const allAmounts = text.match(/(\d{1,3}(?:[.,]\d{3})*[.,]\d{2}|\d{1,6}[.,]\d{2})/g);
+            if (allAmounts && allAmounts.length > 0) {
+                for (const a of allAmounts) {
+                    const cleanStr = a.replace(/[.,](?=\d{3})/g, '').replace(',', '.');
+                    const num = parseFloat(cleanStr);
+                    // Filter out massive unrealistic numbers (e.g. tracking barcodes that happen to end in .00)
+                    if (!isNaN(num) && num > maxFound && num < 100000) {
+                        maxFound = num;
+                    }
+                }
+            }
+        }
+
+        return maxFound > 0 ? maxFound.toFixed(2) : null;
     };
 
     const parseDateFromText = (text: string): string | null => {
-        // Match DD/MM/YYYY or DD.MM.YYYY or DD-MM-YYYY
-        const dateMatch = text.match(/(\d{2})[./\-](\d{2})[./\-](\d{4})/);
+        // Match DD/MM/YYYY or DD.MM.YYYY or DD-MM-YYYY with optional spaces
+        const dateMatch = text.match(/\b([0-3]?\d)\s*[./\-]\s*([0-1]?\d)\s*[./\-]\s*(20\d{2})\b/);
         if (dateMatch) {
-            return `${dateMatch[1]}.${dateMatch[2]}.${dateMatch[3]}`;
+            const day = dateMatch[1].padStart(2, '0');
+            const month = dateMatch[2].padStart(2, '0');
+            const year = dateMatch[3];
+            if (parseInt(day, 10) <= 31 && parseInt(month, 10) <= 12) {
+                return `${day}.${month}.${year}`;
+            }
         }
+
         // Match DD/MM/YY
-        const shortDateMatch = text.match(/(\d{2})[./\-](\d{2})[./\-](\d{2})/);
+        const shortDateMatch = text.match(/\b([0-3]?\d)\s*[./\-]\s*([0-1]?\d)\s*[./\-]\s*(\d{2})\b/);
         if (shortDateMatch) {
-            return `${shortDateMatch[1]}.${shortDateMatch[2]}.20${shortDateMatch[3]}`;
+            const day = shortDateMatch[1].padStart(2, '0');
+            const month = shortDateMatch[2].padStart(2, '0');
+            const year = `20${shortDateMatch[3]}`;
+            if (parseInt(day, 10) <= 31 && parseInt(month, 10) <= 12) {
+                return `${day}.${month}.${year}`;
+            }
         }
         return null;
     };

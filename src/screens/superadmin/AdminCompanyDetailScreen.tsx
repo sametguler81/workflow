@@ -38,6 +38,14 @@ const roleLabels: Record<string, string> = {
     superadmin: 'Super Admin',
 };
 
+function formatSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 export function AdminCompanyDetailScreen({ companyId, onBack }: AdminCompanyDetailScreenProps) {
     const { colors } = useTheme();
     const [company, setCompany] = useState<any>(null);
@@ -165,6 +173,26 @@ export function AdminCompanyDetailScreen({ companyId, onBack }: AdminCompanyDeta
     const plan = PLAN_DETAILS[company.plan as keyof typeof PLAN_DETAILS] || PLAN_DETAILS.free;
     const stats = company.stats || {};
 
+    // Calculate storage usage
+    const usedStorage = company.usedStorage || 0;
+    // Assuming plans.ts has `storageLimit` added, but we define them here safely if admin is checking
+    const isEnterprise = company.plan === 'enterprise';
+    const storageLimitBytes = isEnterprise
+        ? -1
+        : company.plan === 'pro'
+            ? 20 * 1024 * 1024 * 1024
+            : 5 * 1024 * 1024 * 1024;
+
+    const storagePercentage = isEnterprise
+        ? 0
+        : Math.min((usedStorage / storageLimitBytes) * 100, 100);
+
+    const storageColor = storagePercentage > 90
+        ? Colors.danger
+        : storagePercentage > 75
+            ? Colors.warning
+            : Colors.primary;
+
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             <ScrollView
@@ -239,6 +267,35 @@ export function AdminCompanyDetailScreen({ companyId, onBack }: AdminCompanyDeta
                         ))}
                     </View>
 
+                    {/* Storage Usage Card */}
+                    <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={[styles.sectionTitle, { color: colors.text }]}>Depolama ({plan.name})</Text>
+                            <Ionicons name="cloud-outline" size={20} color={Colors.primary} />
+                        </View>
+
+                        <View style={{ marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '600' }}>
+                                Kullanım: {formatSize(usedStorage)}
+                            </Text>
+                            <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '600' }}>
+                                Limit: {isEnterprise ? 'Sınırsız' : formatSize(storageLimitBytes)}
+                            </Text>
+                        </View>
+
+                        <View style={styles.storageBarContainer}>
+                            {!isEnterprise ? (
+                                <View style={[styles.storageBarFill, { width: `${storagePercentage}%`, backgroundColor: storageColor }]} />
+                            ) : (
+                                <LinearGradient
+                                    colors={['#7C3AED', '#3B82F6']}
+                                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                                    style={[styles.storageBarFill, { width: '100%' }]}
+                                />
+                            )}
+                        </View>
+                    </View>
+
                     {/* Plan Management */}
                     <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
                         <View style={styles.sectionHeader}>
@@ -251,7 +308,7 @@ export function AdminCompanyDetailScreen({ companyId, onBack }: AdminCompanyDeta
                         <View style={styles.planInfo}>
                             <Text style={[styles.planName, { color: plan.color }]}>{plan.name}</Text>
                             <Text style={[styles.planPrice, { color: colors.text }]}>
-                                {plan.price === 0 ? 'Ücretsiz' : `₺${plan.price}/ay`}
+                                {plan.monthlyPrice === 0 ? 'Ücretsiz' : `₺${plan.monthlyPrice}/ay`}
                             </Text>
                             <Text style={[styles.planLimit, { color: colors.textTertiary }]}>
                                 {plan.userLimit} kullanıcıya kadar
@@ -276,7 +333,7 @@ export function AdminCompanyDetailScreen({ companyId, onBack }: AdminCompanyDeta
                                                 {p.name}
                                             </Text>
                                             <Text style={[styles.planOptionPrice, { color: colors.textSecondary }]}>
-                                                {p.price === 0 ? 'Ücretsiz' : `₺${p.price}/ay`}
+                                                {p.monthlyPrice === 0 ? 'Ücretsiz' : `₺${p.monthlyPrice}/ay`}
                                             </Text>
                                             {isActive && <Ionicons name="checkmark-circle" size={18} color={p.color} />}
                                         </TouchableOpacity>
@@ -404,6 +461,16 @@ const styles = StyleSheet.create({
     },
     statValue: { fontSize: 18, fontWeight: '800', marginBottom: 2 },
     statLabel: { fontSize: 12, fontWeight: '500' },
+    storageBarContainer: {
+        height: 6,
+        backgroundColor: 'rgba(0,0,0,0.1)',
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    storageBarFill: {
+        height: '100%',
+        borderRadius: 3,
+    },
     section: {
         borderRadius: BorderRadius.xl, borderWidth: 1,
         padding: Spacing.lg, marginBottom: Spacing.lg, ...Shadows.small,

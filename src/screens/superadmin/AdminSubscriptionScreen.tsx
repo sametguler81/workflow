@@ -60,8 +60,8 @@ export function AdminSubscriptionScreen({ onBack, onNavigateCompanyDetail }: Adm
     };
 
     const totalRevenue =
-        planGroups.pro.length * PLAN_DETAILS.pro.price +
-        planGroups.enterprise.length * PLAN_DETAILS.enterprise.price;
+        planGroups.pro.length * PLAN_DETAILS.pro.monthlyPrice +
+        planGroups.enterprise.length * PLAN_DETAILS.enterprise.monthlyPrice;
 
     const renderCompanyItem = ({ item }: { item: CompanyWithStats }) => (
         <TouchableOpacity
@@ -127,7 +127,7 @@ export function AdminSubscriptionScreen({ onBack, onNavigateCompanyDetail }: Adm
                                     <Text style={[styles.planCount, { color: colors.text }]}>{count}</Text>
                                     <Text style={[styles.planPct, { color: colors.textTertiary }]}>{pct}%</Text>
                                     <Text style={[styles.planPriceSmall, { color: colors.textSecondary }]}>
-                                        {plan.price === 0 ? 'Ücretsiz' : `₺${plan.price}/ay`}
+                                        {plan.monthlyPrice === 0 ? 'Ücretsiz' : `₺${plan.monthlyPrice}/ay`}
                                     </Text>
                                 </View>
                             );
@@ -146,7 +146,7 @@ export function AdminSubscriptionScreen({ onBack, onNavigateCompanyDetail }: Adm
                                         {plan.name} ({items.length})
                                     </Text>
                                     <Text style={[styles.sectionPrice, { color: plan.color }]}>
-                                        {plan.price === 0 ? 'Ücretsiz' : `₺${plan.price}/ay`}
+                                        {plan.monthlyPrice === 0 ? 'Ücretsiz' : `₺${plan.monthlyPrice}/ay`}
                                     </Text>
                                 </View>
 

@@ -10,6 +10,7 @@ import { Colors, Shadows } from '../theme/theme';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppTourOverlay } from '../components/AppTourOverlay';
 
 // Onboarding
 import { OnboardingScreen } from '../screens/onboarding/OnboardingScreen';
@@ -735,12 +736,24 @@ export function Navigation() {
   const { user, profile, loading } = useAuth();
   const { colors, isDark } = useTheme();
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
+  const [showAppTour, setShowAppTour] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem('hasSeenOnboarding').then(value => {
       setIsFirstLaunch(value === null);
     });
   }, []);
+
+  // İlk giriş sonrası app tour kontrolü
+  useEffect(() => {
+    if (user && profile) {
+      AsyncStorage.getItem('hasSeenAppTour').then(value => {
+        if (value === null) {
+          setShowAppTour(true);
+        }
+      });
+    }
+  }, [user, profile]);
 
   if (loading || isFirstLaunch === null) {
     return <LoadingSpinner message="Yükleniyor..." />;
@@ -772,13 +785,25 @@ export function Navigation() {
 
   const isSuperAdmin = user && profile?.role === 'superadmin';
 
+  const handleAppTourFinish = async () => {
+    setShowAppTour(false);
+    try {
+      await AsyncStorage.setItem('hasSeenAppTour', 'true');
+    } catch (e) {
+      console.error('Error saving app tour status:', e);
+    }
+  };
+
   return (
-    <NavigationContainer theme={navTheme}>
-      {isFirstLaunch && !user ? (
-        <OnboardingScreen onFinish={() => setIsFirstLaunch(false)} />
-      ) : (
-        !user ? <AuthNavigator /> : isSuperAdmin ? <SuperAdminNavigator /> : <MainNavigator />
-      )}
-    </NavigationContainer>
+    <>
+      <NavigationContainer theme={navTheme}>
+        {isFirstLaunch && !user ? (
+          <OnboardingScreen onFinish={() => setIsFirstLaunch(false)} />
+        ) : (
+          !user ? <AuthNavigator /> : isSuperAdmin ? <SuperAdminNavigator /> : <MainNavigator />
+        )}
+      </NavigationContainer>
+      <AppTourOverlay visible={showAppTour} onFinish={handleAppTourFinish} />
+    </>
   );
 }

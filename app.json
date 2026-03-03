@@ -51,7 +51,8 @@
             "buildReactNativeFromSource": true
           }
         }
-      ]
+      ],
+      "expo-iap"
     ]
   }
 }

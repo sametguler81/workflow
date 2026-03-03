@@ -233,7 +233,7 @@ export function RegisterScreen({ onNavigateLogin }: RegisterScreenProps) {
                                                     <Text style={[styles.planLimit, { color: colors.textSecondary }]}>{plan.userLimit} Kullanıcı</Text>
                                                 </View>
                                                 <Text style={[styles.planPrice, { color: Colors.primary }]}>
-                                                    {plan.price === 0 ? 'Ücretsiz' : `₺${plan.price}/ay`}
+                                                    {plan.monthlyPrice === 0 ? 'Ücretsiz' : `₺${plan.monthlyPrice}/ay`}
                                                 </Text>
                                             </View>
                                             <View style={styles.planDivider} />

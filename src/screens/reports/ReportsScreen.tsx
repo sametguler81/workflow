@@ -11,12 +11,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { Dimensions } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../theme/ThemeContext';
 import { Colors, Spacing, BorderRadius, Shadows } from '../../theme/theme';
 import { getCompanyLeaves, LeaveRequest, LeaveType } from '../../services/leaveService';
 import { getCompanyExpenses, Expense } from '../../services/expenseService';
 import { getCompanyInvoices, Invoice, DocumentType, DOCUMENT_TYPE_LABELS } from '../../services/invoiceService';
+import { getCompany } from '../../services/companyService';
+import { PieChart } from 'react-native-chart-kit';
+
+const screenWidth = Dimensions.get('window').width - Spacing.lg * 2;
 
 type TabKey = 'leaves' | 'expenses' | 'invoices';
 
@@ -108,6 +113,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [companyPlan, setCompanyPlan] = useState<string>('free');
 
     const companyId = profile?.companyId || '';
 
@@ -119,14 +125,16 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     const fetchData = useCallback(async () => {
         if (!companyId) return;
         try {
-            const [leaveRes, expenseRes, invoiceRes] = await Promise.all([
+            const [leaveRes, expenseRes, invoiceRes, companyInfo] = await Promise.all([
                 getCompanyLeaves(companyId, 200),
                 getCompanyExpenses(companyId, 200),
                 getCompanyInvoices(companyId, 200),
+                getCompany(companyId)
             ]);
             setLeaves(leaveRes.data);
             setExpenses(expenseRes.data);
             setInvoices(invoiceRes.data);
+            setCompanyPlan(companyInfo?.plan || 'free');
         } catch (e) {
             console.error('Report fetch error:', e);
         } finally {
@@ -216,6 +224,15 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
         ucretsiz: 'Ücretsiz İzin',
     };
 
+    const hasProFeatures = companyPlan === 'pro' || companyPlan === 'enterprise';
+
+    const chartConfig = {
+        backgroundGradientFrom: colors.card,
+        backgroundGradientTo: colors.card,
+        color: (opacity = 1) => colors.text,
+        strokeWidth: 2,
+    };
+
     // ─── Render Content ─────────────────────────────────
     const renderLeaves = () => (
         <>
@@ -230,9 +247,35 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
             {/* Distribution */}
             <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Durum Dağılımı</Text>
-                <ProgressRow label="Bekleyen" count={leaveStats.pending} total={leaveStats.total} color={Colors.warning} />
-                <ProgressRow label="Onaylı" count={leaveStats.approved} total={leaveStats.total} color={Colors.success} />
-                <ProgressRow label="Reddedilen" count={leaveStats.rejected} total={leaveStats.total} color={Colors.danger} />
+
+                {hasProFeatures ? (
+                    <PieChart
+                        data={[
+                            { name: 'Bekleyen', count: leaveStats.pending, color: Colors.warning, legendFontColor: colors.textSecondary, legendFontSize: 12 },
+                            { name: 'Onaylı', count: leaveStats.approved, color: Colors.success, legendFontColor: colors.textSecondary, legendFontSize: 12 },
+                            { name: 'Red', count: leaveStats.rejected, color: Colors.danger, legendFontColor: colors.textSecondary, legendFontSize: 12 },
+                        ].filter(d => d.count > 0)}
+                        width={screenWidth}
+                        height={160}
+                        chartConfig={chartConfig}
+                        accessor="count"
+                        backgroundColor="transparent"
+                        paddingLeft="0"
+                        center={[10, 0]}
+                        absolute
+                    />
+                ) : (
+                    <View style={[styles.upgradeBox, { backgroundColor: Colors.primary + '15', borderColor: Colors.primary }]}>
+                        <Ionicons name="pie-chart" size={24} color={Colors.primary} />
+                        <Text style={[styles.upgradeText, { color: Colors.primary }]}>Grafikleri görmek için Pro/Kurumsal plana geçin.</Text>
+                    </View>
+                )}
+
+                <View style={{ marginTop: 10 }}>
+                    <ProgressRow label="Bekleyen" count={leaveStats.pending} total={leaveStats.total} color={Colors.warning} />
+                    <ProgressRow label="Onaylı" count={leaveStats.approved} total={leaveStats.total} color={Colors.success} />
+                    <ProgressRow label="Reddedilen" count={leaveStats.rejected} total={leaveStats.total} color={Colors.danger} />
+                </View>
             </View>
 
             {/* By Type */}
@@ -271,9 +314,35 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
 
             <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Durum Dağılımı</Text>
-                <ProgressRow label="Bekleyen" count={expenseStats.pending} total={expenseStats.total} color={Colors.warning} />
-                <ProgressRow label="Onaylı" count={expenseStats.approved} total={expenseStats.total} color={Colors.success} />
-                <ProgressRow label="Reddedilen" count={expenseStats.rejected} total={expenseStats.total} color={Colors.danger} />
+
+                {hasProFeatures ? (
+                    <PieChart
+                        data={[
+                            { name: 'Bekleyen', count: expenseStats.pending, color: Colors.warning, legendFontColor: colors.textSecondary, legendFontSize: 12 },
+                            { name: 'Onaylı', count: expenseStats.approved, color: Colors.success, legendFontColor: colors.textSecondary, legendFontSize: 12 },
+                            { name: 'Red', count: expenseStats.rejected, color: Colors.danger, legendFontColor: colors.textSecondary, legendFontSize: 12 },
+                        ].filter(d => d.count > 0)}
+                        width={screenWidth}
+                        height={160}
+                        chartConfig={chartConfig}
+                        accessor="count"
+                        backgroundColor="transparent"
+                        paddingLeft="0"
+                        center={[10, 0]}
+                        absolute
+                    />
+                ) : (
+                    <View style={[styles.upgradeBox, { backgroundColor: Colors.primary + '15', borderColor: Colors.primary }]}>
+                        <Ionicons name="pie-chart" size={24} color={Colors.primary} />
+                        <Text style={[styles.upgradeText, { color: Colors.primary }]}>Grafikleri görmek için Pro/Kurumsal plana geçin.</Text>
+                    </View>
+                )}
+
+                <View style={{ marginTop: 10 }}>
+                    <ProgressRow label="Bekleyen" count={expenseStats.pending} total={expenseStats.total} color={Colors.warning} />
+                    <ProgressRow label="Onaylı" count={expenseStats.approved} total={expenseStats.total} color={Colors.success} />
+                    <ProgressRow label="Reddedilen" count={expenseStats.rejected} total={expenseStats.total} color={Colors.danger} />
+                </View>
             </View>
 
             <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
@@ -311,9 +380,35 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
 
             <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Durum Dağılımı</Text>
-                <ProgressRow label="Bekleyen" count={invoiceStats.pending} total={invoiceStats.total} color={Colors.warning} />
-                <ProgressRow label="Onaylı" count={invoiceStats.approved} total={invoiceStats.total} color={Colors.success} />
-                <ProgressRow label="Reddedilen" count={invoiceStats.rejected} total={invoiceStats.total} color={Colors.danger} />
+
+                {hasProFeatures ? (
+                    <PieChart
+                        data={[
+                            { name: 'Bekleyen', count: invoiceStats.pending, color: Colors.warning, legendFontColor: colors.textSecondary, legendFontSize: 12 },
+                            { name: 'Onaylı', count: invoiceStats.approved, color: Colors.success, legendFontColor: colors.textSecondary, legendFontSize: 12 },
+                            { name: 'Red', count: invoiceStats.rejected, color: Colors.danger, legendFontColor: colors.textSecondary, legendFontSize: 12 },
+                        ].filter(d => d.count > 0)}
+                        width={screenWidth}
+                        height={160}
+                        chartConfig={chartConfig}
+                        accessor="count"
+                        backgroundColor="transparent"
+                        paddingLeft="0"
+                        center={[10, 0]}
+                        absolute
+                    />
+                ) : (
+                    <View style={[styles.upgradeBox, { backgroundColor: Colors.primary + '15', borderColor: Colors.primary }]}>
+                        <Ionicons name="pie-chart" size={24} color={Colors.primary} />
+                        <Text style={[styles.upgradeText, { color: Colors.primary }]}>Grafikleri görmek için Pro/Kurumsal plana geçin.</Text>
+                    </View>
+                )}
+
+                <View style={{ marginTop: 10 }}>
+                    <ProgressRow label="Bekleyen" count={invoiceStats.pending} total={invoiceStats.total} color={Colors.warning} />
+                    <ProgressRow label="Onaylı" count={invoiceStats.approved} total={invoiceStats.total} color={Colors.success} />
+                    <ProgressRow label="Reddedilen" count={invoiceStats.rejected} total={invoiceStats.total} color={Colors.danger} />
+                </View>
             </View>
 
             <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
@@ -585,4 +680,20 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
         fontSize: 14,
     },
+    upgradeBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        gap: 10,
+        marginBottom: 10,
+    },
+    upgradeText: {
+        fontSize: 13,
+        fontWeight: '700',
+        flex: 1,
+    }
 });
