@@ -69,8 +69,14 @@ export function InputField({
                         style,
                     ]}
                     placeholderTextColor={colors.textTertiary}
-                    onFocus={() => setFocused(true)}
-                    onBlur={() => setFocused(false)}
+                    onFocus={(e) => {
+                        setFocused(true);
+                        props.onFocus?.(e);
+                    }}
+                    onBlur={(e) => {
+                        setFocused(false);
+                        props.onBlur?.(e);
+                    }}
                     secureTextEntry={isPassword && !showPassword}
                     {...props}
                 />

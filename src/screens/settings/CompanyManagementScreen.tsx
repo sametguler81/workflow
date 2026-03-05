@@ -16,7 +16,8 @@ import { PremiumButton } from '../../components/PremiumButton';
 import { InputField } from '../../components/InputField';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Colors, Spacing, BorderRadius, Shadows } from '../../theme/theme';
-import { getCompanyMembers, updateUserRole } from '../../services/companyService';
+import { getCompanyMembers, updateUserRole, getCompany, Company } from '../../services/companyService';
+import { PLAN_DETAILS } from '../../constants/plans';
 import {
     getAuth,
     createUserWithEmailAndPassword,
@@ -46,12 +47,17 @@ export function CompanyManagementScreen({ onBack }: CompanyManagementScreenProps
     const [newPassword, setNewPassword] = useState('');
     const [newRole, setNewRole] = useState<'personel' | 'idari' | 'muhasebe'>('personel');
     const [registering, setRegistering] = useState(false);
+    const [companyDetails, setCompanyDetails] = useState<Company | null>(null);
 
     const loadMembers = useCallback(async () => {
         if (!profile) return;
         try {
-            const data = await getCompanyMembers(profile.companyId);
-            setMembers(data);
+            const [membersData, companyData] = await Promise.all([
+                getCompanyMembers(profile.companyId),
+                getCompany(profile.companyId)
+            ]);
+            setMembers(membersData);
+            setCompanyDetails(companyData);
         } catch (err) {
             console.error(err);
         } finally {
@@ -70,6 +76,20 @@ export function CompanyManagementScreen({ onBack }: CompanyManagementScreenProps
             Alert.alert('Uyarı', 'Şifre en az 6 karakter olmalı.');
             return;
         }
+
+        // --- Quota Check ---
+        if (companyDetails) {
+            const plan = PLAN_DETAILS[companyDetails.plan || 'free'];
+            if (plan.userLimit !== -1 && members.length >= plan.userLimit) {
+                Alert.alert(
+                    'Limit Dedi!',
+                    `Mevcut planınız (${plan.name}) maksimum ${plan.userLimit} kullanıcıya izin veriyor. Daha fazla kullanıcı eklemek için lütfen planınızı yükseltin.`
+                );
+                return;
+            }
+        }
+        // -------------------
+
         setRegistering(true);
 
         // Use a secondary app to create user without logging out the current admin
@@ -145,6 +165,22 @@ export function CompanyManagementScreen({ onBack }: CompanyManagementScreenProps
     };
 
     if (loading) return <LoadingSpinner message="Yükleniyor..." />;
+
+    const getUserQuotaInfo = () => {
+        if (!companyDetails) return null;
+        const plan = PLAN_DETAILS[companyDetails.plan || 'free'];
+        if (plan.userLimit === -1) return null;
+
+        const percentage = Math.min((members.length / plan.userLimit) * 100, 100);
+        return {
+            used: members.length,
+            limit: plan.userLimit,
+            percentage,
+            isFull: members.length >= plan.userLimit
+        };
+    };
+
+    const quotaInfo = getUserQuotaInfo();
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -226,9 +262,39 @@ export function CompanyManagementScreen({ onBack }: CompanyManagementScreenProps
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
                 ListHeaderComponent={
-                    <Text style={[styles.memberCount, { color: colors.textSecondary }]}>
-                        {members.length} Üye
-                    </Text>
+                    <View>
+                        {quotaInfo && (
+                            <View style={[styles.quotaBanner, { backgroundColor: colors.surfaceVariant, borderColor: colors.borderLight }]}>
+                                <View style={styles.quotaHeader}>
+                                    <Ionicons
+                                        name="people-outline"
+                                        size={18}
+                                        color={quotaInfo.isFull ? Colors.danger : Colors.primary}
+                                    />
+                                    <Text style={[styles.quotaTitle, { color: colors.text }]}>
+                                        Plan Kullanıcı Sınırı
+                                    </Text>
+                                    <Text style={[styles.quotaValue, { color: quotaInfo.isFull ? Colors.danger : colors.textSecondary }]}>
+                                        {quotaInfo.used} / {quotaInfo.limit}
+                                    </Text>
+                                </View>
+                                <View style={[styles.progressBarBg, { backgroundColor: colors.borderLight }]}>
+                                    <View
+                                        style={[
+                                            styles.progressBarFill,
+                                            {
+                                                width: `${quotaInfo.percentage}%`,
+                                                backgroundColor: quotaInfo.isFull ? Colors.danger : Colors.primary
+                                            }
+                                        ]}
+                                    />
+                                </View>
+                            </View>
+                        )}
+                        <Text style={[styles.memberCount, { color: colors.textSecondary }]}>
+                            {members.length} Üye
+                        </Text>
+                    </View>
                 }
                 renderItem={({ item }) => (
                     <View style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
@@ -295,5 +361,35 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 12,
+    },
+    quotaBanner: {
+        padding: Spacing.md,
+        borderRadius: BorderRadius.lg,
+        borderWidth: 1,
+        marginBottom: Spacing.lg,
+    },
+    quotaHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: Spacing.xs,
+        gap: Spacing.xs,
+    },
+    quotaTitle: {
+        flex: 1,
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    quotaValue: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    progressBarBg: {
+        height: 6,
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    progressBarFill: {
+        height: '100%',
+        borderRadius: 3,
     },
 });

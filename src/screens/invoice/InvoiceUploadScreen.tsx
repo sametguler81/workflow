@@ -26,6 +26,10 @@ import {
     DOCUMENT_TYPE_LABELS,
     DOCUMENT_TYPE_ICONS,
 } from '../../services/invoiceService';
+import { getCompany, Company } from '../../services/companyService';
+import { PLAN_DETAILS } from '../../constants/plans';
+import { createAnnouncement } from '../../services/announcementService';
+import { formatCurrencyInput, parseCurrencyToFloat } from '../../utils/currencyFormatter';
 
 interface InvoiceUploadScreenProps {
     onBack: () => void;
@@ -49,7 +53,9 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
     const [documentType, setDocumentType] = useState<DocumentType>(invoiceToEdit?.documentType || 'fatura');
     const [category, setCategory] = useState(invoiceToEdit?.category || CATEGORIES[direction as keyof typeof CATEGORIES][0]);
     const [imageUri, setImageUri] = useState(invoiceToEdit?.imageUri || (invoiceToEdit?.imageBase64 || ''));
-    const [amount, setAmount] = useState(invoiceToEdit?.amount.toString() || '');
+    const [amount, setAmount] = useState(
+        invoiceToEdit?.amount ? formatCurrencyInput(invoiceToEdit.amount.toString().replace('.', ',')) : ''
+    );
     const [date, setDate] = useState(() => {
         if (invoiceToEdit?.date) return invoiceToEdit.date;
         const d = new Date();
@@ -61,12 +67,23 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
     const [fileName, setFileName] = useState(invoiceToEdit ? 'Mevcut Belge' : '');
     const [fileType, setFileType] = useState<'image' | 'pdf'>('image');
 
+    // Limits State
+    const [companyDetails, setCompanyDetails] = useState<Company | null>(null);
+
+    useEffect(() => {
+        if (profile?.companyId) {
+            getCompany(profile.companyId)
+                .then(setCompanyDetails)
+                .catch(err => console.error("Failed to load company limits for invoice screen", err));
+        }
+    }, [profile?.companyId]);
+
     useEffect(() => {
         if (invoiceToEdit) {
             setDocumentType(invoiceToEdit.documentType);
             setCategory(invoiceToEdit.category);
             setImageUri(invoiceToEdit.imageUri || invoiceToEdit.imageBase64 || '');
-            setAmount(invoiceToEdit.amount.toString());
+            setAmount(invoiceToEdit.amount ? formatCurrencyInput(invoiceToEdit.amount.toString().replace('.', ',')) : '');
             setDate(invoiceToEdit.date);
             setDueDate(invoiceToEdit.dueDate || '');
             setDescription(invoiceToEdit.description || '');
@@ -95,7 +112,7 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
 
                 const result = await ImagePicker.launchCameraAsync({
                     mediaTypes: ['images'],
-                    quality: 0.5,
+                    quality: 0.3, // Compressed for upload
                     allowsEditing: false,
                 });
 
@@ -113,7 +130,7 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
 
                 const result = await ImagePicker.launchImageLibraryAsync({
                     mediaTypes: ['images'],
-                    quality: 0.5,
+                    quality: 0.3, // Compressed for upload
                     allowsEditing: false,
                 });
 
@@ -152,7 +169,8 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
             Alert.alert('Uyarı', 'Lütfen belge ekleyin.');
             return;
         }
-        if (!amount || isNaN(Number(amount))) {
+        const numericAmount = parseCurrencyToFloat(amount);
+        if (!amount || numericAmount <= 0) {
             Alert.alert('Uyarı', 'Geçerli bir tutar girin.');
             return;
         }
@@ -164,31 +182,21 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
 
         setLoading(true);
         try {
-            let base64 = invoiceToEdit?.imageBase64;
+            // Note: We no longer convert to base64 here. We rely on passing the local imageUri 
+            // to the service, which will handle uploading it to Firebase Storage.
+            // When editing an existing invoice without changing the image, `imageUri` will be 
+            // the existing URL or Base64 string from Firestore.
 
-            if (imageUri && imageUri !== invoiceToEdit?.imageBase64 && imageUri !== invoiceToEdit?.imageUri) {
-                const response = await fetch(imageUri);
-                const blob = await response.blob();
-                base64 = await new Promise<string>((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        const result = reader.result as string;
-                        resolve(result);
-                    };
-                    reader.onerror = reject;
-                    reader.readAsDataURL(blob);
-                });
-            }
 
             if (invoiceToEdit) {
                 await updateInvoice(invoiceToEdit.id, {
                     documentType: documentType || 'fatura',
-                    amount: parseFloat(amount) || 0,
+                    amount: numericAmount,
                     description: (description || fileName) || '',
                     date: date || new Date().toISOString(),
                     direction: direction || 'expense',
                     category: category || 'Diğer',
-                    imageBase64: base64 ?? null,
+                    imageUri: imageUri !== invoiceToEdit.imageUri && imageUri !== invoiceToEdit.imageBase64 ? imageUri : undefined, // Pass if changed
                     dueDate: dueDate ?? null,
                 });
                 Alert.alert('Başarılı', 'Belge güncellendi.', [
@@ -200,10 +208,9 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
                     userName: profile.displayName,
                     companyId: profile.companyId,
                     documentType,
-                    amount: parseFloat(amount),
+                    amount: numericAmount,
                     description: description || fileName, // Use filename as fallback desc
-                    imageUri: '', // We use base64 mostly
-                    imageBase64: base64,
+                    imageUri: imageUri, // Pass the local file URI, the service will upload it
                     date,
                     direction: direction,
                     category,
@@ -222,31 +229,67 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
         }
     };
 
-    return (
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.flex}
-            >
-                <ScrollView
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                >
-                    {/* Header */}
-                    <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-                        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                            <Ionicons name="arrow-back" size={24} color={colors.text} />
-                        </TouchableOpacity>
-                        <Text style={[styles.headerTitle, { color: colors.text }]}>
-                            {invoiceToEdit
-                                ? 'Belge Düzenle'
-                                : (direction === 'income' ? 'Gelir Ekle' : 'Gider Ekle')}
-                        </Text>
-                        <View style={{ width: 40 }} />
-                    </View>
+    const isFreePlanAndLimited = () => {
+        if (!companyDetails) return false;
+        const currentPlan = PLAN_DETAILS[companyDetails.plan || 'free'];
 
-                    <View style={styles.form}>
+        if (currentPlan.storageLimit !== -1) {
+            const usedBytes = companyDetails.usedStorage || 0;
+            const limitBytes = currentPlan.storageLimit;
+            const usedMB = usedBytes / (1024 * 1024);
+            const limitGB = limitBytes / (1024 * 1024 * 1024);
+
+            return {
+                isLimited: true,
+                usedText: `${usedMB.toFixed(1)} MB`,
+                limitText: `${limitGB.toFixed(0)} GB`,
+                used: usedBytes,
+                limit: limitBytes,
+                percentage: Math.min((usedBytes / limitBytes) * 100, 100)
+            };
+        }
+        return false;
+    };
+
+    const quotaInfo = isFreePlanAndLimited();
+
+    return (
+        <KeyboardAvoidingView
+            style={[styles.container, { backgroundColor: colors.background }]}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+            <View style={[styles.header, { borderBottomColor: colors.borderLight }]}>
+                <TouchableOpacity onPress={onBack} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={24} color={colors.text} />
+                </TouchableOpacity>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>
+                    {invoiceToEdit
+                        ? 'Belge Düzenle'
+                        : (direction === 'income' ? 'Gelir Ekle' : 'Gider Ekle')}
+                </Text>
+                <View style={{ width: 24 }} />
+            </View>
+
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {!!(quotaInfo && typeof quotaInfo === 'object' && quotaInfo.isLimited) ? (
+                    <View style={[styles.quotaBanner, { backgroundColor: Colors.danger + '10', borderColor: Colors.danger + '30', borderWidth: 1 }]}>
+                        <View style={styles.quotaHeader}>
+                            <Ionicons name="cloud-outline" size={20} color={Colors.danger} />
+                            <Text style={[styles.quotaTitle, { color: Colors.danger }]}>
+                                {quotaInfo.used >= quotaInfo.limit ? 'Depolama Alanı Doldu!' : 'Başlangıç Planı Depolama Sınırı'}
+                            </Text>
+                        </View>
+                        <Text style={[styles.quotaSubText, { color: colors.textSecondary }]}>
+                            {quotaInfo.usedText} / {quotaInfo.limitText} Kullanıldı
+                        </Text>
+                        <View style={styles.progressBarBg}>
+                            <View style={[styles.progressBarFill, { width: `${quotaInfo.percentage}%`, backgroundColor: quotaInfo.percentage >= 100 ? Colors.danger : Colors.warning }]} />
+                        </View>
+                    </View>
+                ) : null}
+
+                <View style={[styles.formCard, { backgroundColor: colors.card, borderColor: colors.borderLight }]}>
+                    <View style={styles.formSection}>
                         {/* Category Selector */}
                         <Text style={[styles.label, { color: colors.textSecondary }]}>Kategori</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.xl }}>
@@ -375,7 +418,15 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
                             icon="cash-outline"
                             placeholder="0.00"
                             value={amount}
-                            onChangeText={setAmount}
+                            onFocus={() => {
+                                setAmount(amount.replace(/\./g, ''));
+                            }}
+                            onChangeText={(text) => {
+                                setAmount(text.replace('.', ','));
+                            }}
+                            onBlur={() => {
+                                setAmount(formatCurrencyInput(amount));
+                            }}
                             keyboardType="decimal-pad"
                         />
 
@@ -402,17 +453,23 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
 
                         {/* Submit */}
                         <PremiumButton
-                            title={loading ? 'İşleniyor...' : (invoiceToEdit ? 'Güncelle' : 'Kaydet')}
+                            title={!!(quotaInfo && typeof quotaInfo === 'object' && quotaInfo.isLimited && quotaInfo.used >= quotaInfo.limit)
+                                ? 'Limit Doldu'
+                                : (loading ? 'İşleniyor...' : (invoiceToEdit ? 'Güncelle' : 'Kaydet'))}
                             onPress={handleSubmit}
                             loading={loading}
+                            disabled={!!(quotaInfo && typeof quotaInfo === 'object' && quotaInfo.isLimited && quotaInfo.used >= quotaInfo.limit)}
                             size="lg"
                             icon={<Ionicons name="cloud-upload" size={18} color="#FFF" />}
-                            style={{ marginTop: Spacing.lg }}
+                            style={{
+                                marginTop: Spacing.lg,
+                                opacity: !!(quotaInfo && typeof quotaInfo === 'object' && quotaInfo.isLimited && quotaInfo.used >= quotaInfo.limit) ? 0.6 : 1
+                            }}
                         />
                     </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
-        </View >
+                </View>
+            </ScrollView>
+        </KeyboardAvoidingView>
     );
 }
 
@@ -494,5 +551,44 @@ const styles = StyleSheet.create({
         zIndex: 10,
         backgroundColor: '#FFF',
         borderRadius: 14,
+    },
+    formCard: {
+        padding: Spacing.lg,
+        borderRadius: BorderRadius.xl,
+        borderWidth: 1,
+        ...Shadows.small,
+        marginBottom: Spacing.xl,
+    },
+    formSection: {
+        marginBottom: Spacing.md,
+    },
+    quotaBanner: {
+        padding: Spacing.lg,
+        borderRadius: BorderRadius.xl,
+        marginBottom: Spacing.xl,
+    },
+    quotaHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: Spacing.sm,
+    },
+    quotaTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        marginLeft: Spacing.sm,
+    },
+    quotaSubText: {
+        fontSize: 13,
+        marginBottom: Spacing.md,
+    },
+    progressBarBg: {
+        height: 8,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    progressBarFill: {
+        height: '100%',
+        borderRadius: 4,
     },
 });

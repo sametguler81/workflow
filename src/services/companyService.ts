@@ -9,6 +9,7 @@ import {
     where,
     updateDoc,
     addDoc,
+    increment,
 } from '@react-native-firebase/firestore';
 
 const db = getFirestore();
@@ -61,4 +62,16 @@ export async function updateUserRole(
     role: 'personel' | 'idari' | 'muhasebe'
 ) {
     await updateDoc(doc(db, 'users', uid), { role });
+}
+
+/**
+ * Helper to update the company usedStorage when files are uploaded or deleted.
+ * @param companyId The ID of the company
+ * @param sizeChangeBytes Positive number for additions, negative for deletions
+ */
+export async function updateCompanyStorageUsage(companyId: string, sizeChangeBytes: number): Promise<void> {
+    const companyRef = doc(db, 'companies', companyId);
+    await updateDoc(companyRef, {
+        usedStorage: increment(sizeChangeBytes)
+    });
 }

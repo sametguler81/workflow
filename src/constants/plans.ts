@@ -3,26 +3,29 @@ export const PLAN_DETAILS = {
         name: 'Başlangıç',
         tag: 'FREE',
         userLimit: 5,
+        documentLimit: -1, // No absolute count limit, only storage size (5GB)
         storageLimit: 5 * 1024 * 1024 * 1024, // 5GB in bytes
         monthlyPrice: 0,
         yearlyPrice: 0,
-        features: ['5 kullanıcıya kadar', '5 GB Depolama', 'Temel izin yönetimi', 'Yoklama takibi'],
+        features: ['5 kullanıcıya kadar', '5 GB Toplam Depolama', 'Temel izin yönetimi', 'Yoklama takibi'],
         color: '#64748B',
     },
     pro: {
         name: 'Profesyonel',
         tag: 'PRO',
-        userLimit: 25,
+        userLimit: 20,
+        documentLimit: -1, // Unlimited count
         storageLimit: 20 * 1024 * 1024 * 1024, // 20GB in bytes
         monthlyPrice: 499,
         yearlyPrice: 4499,
-        features: ['25 kullanıcıya kadar', '20 GB Depolama', 'Gelişmiş raporlama', 'Masraf yönetimi', 'Belge yönetimi', 'Öncelikli destek'],
+        features: ['20 kullanıcıya kadar', '20 GB Toplam Depolama', 'Gelişmiş raporlama', 'Masraf yönetimi', 'Belge yönetimi', 'Öncelikli destek'],
         color: '#1E40AF',
     },
     enterprise: {
         name: 'Kurumsal',
         tag: 'ENTERPRISE',
-        userLimit: 999,
+        userLimit: -1,
+        documentLimit: -1, // Unlimited
         storageLimit: -1, // Unlimited
         monthlyPrice: 999,
         yearlyPrice: 8999,

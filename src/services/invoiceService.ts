@@ -13,12 +13,14 @@ import {
     startAfter,
     deleteDoc,
     FirebaseFirestoreTypes,
+    deleteField,
 } from '@react-native-firebase/firestore';
 
 import { createAnnouncement } from './announcementService';
 import { notifyRolesInCompany, sendPushNotification } from './notificationService';
-import { getCompany } from './companyService';
+import { getCompany, updateCompanyStorageUsage } from './companyService';
 import { PLAN_DETAILS } from '../constants/plans';
+import { uploadFileToStorage, getFileSizeBytes } from './storageService';
 
 const db = getFirestore();
 
@@ -45,6 +47,7 @@ export interface Invoice {
     dueDate?: string | null;
     reviewedBy?: string | null;
     reviewNote?: string | null;
+    fileSizeBytes?: number; // Real uploaded file size for accurate storage tracking
     createdAt: string;
     updatedAt?: string;
 }
@@ -75,6 +78,14 @@ export const DOCUMENT_TYPE_ICONS: Record<DocumentType, string> = {
 export async function createInvoice(
     data: Omit<Invoice, 'id' | 'status' | 'createdAt'>
 ): Promise<string> {
+    // Build cleaned payload (strip undefined values)
+    const modifiedData: any = {};
+    Object.entries(data).forEach(([key, value]) => {
+        if (value !== undefined) {
+            modifiedData[key] = value;
+        }
+    });
+
     // ─── Storage Limit Check ─────────────────────────────
     const company = await getCompany(data.companyId);
     if (!company) throw new Error('Firma bilgisi bulunamadı.');
@@ -82,29 +93,44 @@ export async function createInvoice(
     const currentPlan = PLAN_DETAILS[company.plan || 'free'];
     const limitBytes = currentPlan.storageLimit;
 
-    // -1 means unlimited
+    let downloadURL = modifiedData.imageUri;
+    let realFileSizeBytes = 0;
+
+    // Measure real file size BEFORE upload (so limit check uses actual bytes)
+    if (downloadURL && downloadURL.startsWith('file://')) {
+        realFileSizeBytes = await getFileSizeBytes(downloadURL);
+    }
+
+    // Storage Size Limit Check (-1 means unlimited)
     if (limitBytes !== -1) {
         const currentUsage = company.usedStorage || 0;
-        let estimatedNewSize = JSON.stringify(data).length;
-        if (data.imageBase64) {
-            estimatedNewSize += Math.round((data.imageBase64.length * 3) / 4);
-        }
-
-        if (currentUsage + estimatedNewSize > limitBytes) {
-            throw new Error(`Paketinizin depolama limiti dolmuştur (${(limitBytes / (1024 * 1024 * 1024)).toFixed(0)} GB). Lütfen paketinizi yükseltin.`);
+        if (currentUsage + realFileSizeBytes > limitBytes) {
+            const limitGB = (limitBytes / (1024 * 1024 * 1024)).toFixed(0);
+            throw new Error(`Paketinizin depolama limiti dolmuştur (${limitGB} GB). Lütfen paketinizi yükseltin.`);
         }
     }
-    // ⚠️ GÜVENLİK VE PERFORMANS UYARISI:
-    // Base64 resimlerin (özellikle fatura/belge gibi yüksek çözünürlüklü) doğrudan Firestore dokümanlarında saklanması,
-    // (a) 1MB doküman boyutu sınırına ulaşılmasına,
-    // (b) Yüksek okuma maliyetlerine ve performans sorunlarına yol açabilir.
-    // İleriki aşamalarda resimlerin Firebase Storage'a yüklenip, 
-    // Firestore'da sadece URL'lerinin tutulması önerilir.
+
+    // Upload file to Firebase Storage and record real size
+    if (downloadURL && downloadURL.startsWith('file://')) {
+        const destination = `companies/${modifiedData.companyId}/invoices/${modifiedData.userId}`;
+        const result = await uploadFileToStorage(downloadURL, destination);
+        downloadURL = result.downloadURL;
+        realFileSizeBytes = result.sizeBytes || realFileSizeBytes;
+        modifiedData.fileSizeBytes = realFileSizeBytes;
+
+        // Increment company storage usage by real file size
+        await updateCompanyStorageUsage(modifiedData.companyId, realFileSizeBytes);
+    }
+
+    modifiedData.imageUri = downloadURL;
+    delete modifiedData.imageBase64; // ensure we don't save any base64 string to Firestore
+
     const ref = await addDoc(collection(db, 'invoices'), {
-        ...data,
+        ...modifiedData,
         status: 'pending',
         createdAt: new Date().toISOString(),
     });
+
 
     // Trigger Notification for Muhasebe & Admin
     try {
@@ -289,8 +315,35 @@ export async function updateInvoice(
     invoiceId: string,
     data: Partial<Omit<Invoice, 'id' | 'createdAt'>>
 ): Promise<void> {
-    const updateData = {
-        ...data,
+    let updateData: any = { ...data };
+
+    if (updateData.imageUri && updateData.imageUri.startsWith('file://')) {
+        const invoiceDoc = await getDoc(doc(db, 'invoices', invoiceId));
+        if (invoiceDoc.exists()) {
+            const currentData = invoiceDoc.data() as Invoice;
+            const destination = `companies/${currentData.companyId}/invoices/${currentData.userId}`;
+            const downloadURL = await uploadFileToStorage(updateData.imageUri, destination);
+            updateData.imageUri = downloadURL;
+            updateData.imageBase64 = deleteField(); // explicitly clear to save DB space
+
+            // Track the added image size roughly
+            if (!currentData.imageUri && !currentData.imageBase64) {
+                await updateCompanyStorageUsage(currentData.companyId, 300000);
+            }
+        }
+    } else {
+        delete updateData.imageBase64;
+    }
+
+    // Ensure we don't pass undefined fields which firestore rejects
+    Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) {
+            delete updateData[key];
+        }
+    });
+
+    updateData = {
+        ...updateData,
         updatedAt: new Date().toISOString(),
     };
     await updateDoc(doc(db, 'invoices', invoiceId), updateData);
@@ -307,5 +360,17 @@ export async function getInvoiceById(invoiceId: string): Promise<Invoice | null>
 
 // ─── Delete ────────────────────────────────────────────
 export async function deleteInvoice(invoiceId: string): Promise<void> {
+    const invoiceDoc = await getDoc(doc(db, 'invoices', invoiceId));
+    if (invoiceDoc.exists()) {
+        const data = invoiceDoc.data() as Invoice;
+        if (data.imageUri || data.imageBase64) {
+            // Decrement by the real stored file size (fall back to 0 if missing)
+            const sizeToReclaim = data.fileSizeBytes || 0;
+            if (sizeToReclaim > 0) {
+                await updateCompanyStorageUsage(data.companyId, -sizeToReclaim);
+            }
+        }
+    }
+
     await deleteDoc(doc(db, 'invoices', invoiceId));
 }

@@ -15,6 +15,7 @@ import { GradientCard } from '../../components/GradientCard';
 import { Colors, Spacing, BorderRadius, Shadows } from '../../theme/theme';
 import * as ImagePicker from 'expo-image-picker';
 import { updateUserProfile } from '../../services/authService';
+import { uploadFileToStorage } from '../../services/storageService';
 import { Alert, ActivityIndicator } from 'react-native';
 
 const roleLabels: Record<string, string> = {
@@ -52,17 +53,21 @@ export function ProfileScreen({ onBack }: ProfileScreenProps) {
                 mediaTypes: ['images'],
                 allowsEditing: true,
                 aspect: [1, 1],
-                quality: 0.4,
-                base64: true,
+                quality: 0.3, // Compressed for upload
             });
 
-            if (!result.canceled && result.assets[0].base64) {
+            if (!result.canceled && result.assets && result.assets.length > 0) {
                 if (!profile) return;
                 setUploading(true);
 
-                const base64Img = `data:image/jpeg;base64,${result.assets[0].base64}`;
+                const imageUri = result.assets[0].uri;
+                const destination = `companies/${profile.companyId}/profiles/${profile.uid}`;
 
-                await updateUserProfile(profile.uid, { photoURL: base64Img });
+                // Upload to Firebase Storage
+                const downloadURL = await uploadFileToStorage(imageUri, destination);
+
+                // Update the user document in Firestore with the Storage URL
+                await updateUserProfile(profile.uid, { photoURL: downloadURL });
                 Alert.alert('Başarılı', 'Profil fotoğrafı güncellendi! (Uygulamayı yeniden başlattığınızda her yerde görünecektir)');
             }
         } catch (error) {
