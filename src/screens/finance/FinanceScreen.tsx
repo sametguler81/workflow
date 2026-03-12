@@ -53,27 +53,27 @@ export function FinanceScreen({ onBack, onNavigateCreateInvoice, onNavigateInvoi
             // 1. Calculate Income (Invoices with direction='income')
             const income = invoicesRes.data
                 .filter(i => i.direction === 'income' && i.status === 'approved')
-                .reduce((sum, item) => sum + Number(item.amount), 0);
+                .reduce((sum, item) => sum + Number(item.amountInTRY || item.amount), 0);
 
             // 2. Calculate Company Direct Expenses (Invoices with direction='expense')
             const invoiceExpense = invoicesRes.data
                 .filter(i => i.direction === 'expense' && i.status === 'approved')
-                .reduce((sum, item) => sum + Number(item.amount), 0);
+                .reduce((sum, item) => sum + Number(item.amountInTRY || item.amount), 0);
 
             // 3. Calculate Personnel Expenses
             const approvedExpenses = expensesRes.data.filter(e => e.status === 'approved');
 
             const companyCardExpenses = approvedExpenses
                 .filter(e => e.paymentMethod === 'company_card')
-                .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+                .reduce((sum, e) => sum + Number(e.amountInTRY || e.amount || 0), 0);
 
             const personalExpenses = approvedExpenses
                 .filter(e => e.paymentMethod === 'personal')
-                .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+                .reduce((sum, e) => sum + Number(e.amountInTRY || e.amount || 0), 0);
 
             const reimbursedPersonalExpenses = approvedExpenses
                 .filter(e => e.paymentMethod === 'personal' && e.isReimbursed)
-                .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+                .reduce((sum, e) => sum + Number(e.amountInTRY || e.amount || 0), 0);
 
             // Net Kasa = Income - (InvoiceExpense + CompanyCardExpense + ReimbursedPersonalExpenses)
             const cashOutflow = invoiceExpense + companyCardExpenses + reimbursedPersonalExpenses;
@@ -95,7 +95,7 @@ export function FinanceScreen({ onBack, onNavigateCreateInvoice, onNavigateInvoi
                     if (!debtMap[e.userId]) {
                         debtMap[e.userId] = { userId: e.userId, userName: e.userName, amount: 0, count: 0 };
                     }
-                    debtMap[e.userId].amount += e.amount;
+                    debtMap[e.userId].amount += (e.amountInTRY || e.amount);
                     debtMap[e.userId].count += 1;
                 });
 
@@ -167,6 +167,11 @@ export function FinanceScreen({ onBack, onNavigateCreateInvoice, onNavigateInvoi
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(amount);
+    };
+
+    const formatItemCurrency = (amount: number, currencyCode?: string) => {
+        const code = currencyCode || 'TRY';
+        return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: code }).format(amount);
     };
 
     const handleTransactionPress = (item: any) => {
@@ -338,7 +343,7 @@ export function FinanceScreen({ onBack, onNavigateCreateInvoice, onNavigateInvoi
                                 <Text style={[styles.transAmount, {
                                     color: isIncome ? Colors.success : Colors.danger
                                 }]}>
-                                    {isIncome ? '+' : '-'}{formatCurrency(item.amount)}
+                                    {isIncome ? '+' : '-'}{formatItemCurrency(item.amount, item.currency)}
                                 </Text>
                                 {isPersonnel && item.isPersonal && !item.isReimbursed && (
                                     <Text style={{ fontSize: 10, color: Colors.warning, fontWeight: '700' }}>(Ödenmedi)</Text>

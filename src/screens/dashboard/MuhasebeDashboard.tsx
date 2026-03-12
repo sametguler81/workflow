@@ -64,14 +64,19 @@ export function MuhasebeDashboard({
     const pendingExpenses = expenses.filter((e) => e.status === 'pending');
     const approvedExpenses = expenses.filter((e) => e.status === 'approved');
     const rejectedExpenses = expenses.filter((e) => e.status === 'rejected');
-    const totalApproved = approvedExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalApproved = approvedExpenses.reduce((sum, e) => sum + (e.amountInTRY || e.amount || 0), 0);
     const approvalRate = expenses.length > 0
         ? Math.round((approvedExpenses.length / (approvedExpenses.length + rejectedExpenses.length || 1)) * 100)
         : 0;
 
     const receivables = expenses
         .filter(e => e.userId === profile?.uid && e.status === 'approved' && e.paymentMethod === 'personal' && !e.isReimbursed)
-        .reduce((sum, e) => sum + e.amount, 0);
+        .reduce((sum, e) => sum + (e.amountInTRY || e.amount || 0), 0);
+        
+    const formatItemCurrency = (amount: number, currencyCode?: string) => {
+        const code = currencyCode || 'TRY';
+        return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: code }).format(amount);
+    };
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -224,7 +229,7 @@ export function MuhasebeDashboard({
                                     {expense.userName}
                                 </Text>
                                 <Text style={[styles.listItemTitle, { color: Colors.primary, fontSize: 13, marginTop: 2 }]}>
-                                    ₺{expense.amount.toFixed(2)}
+                                    {formatItemCurrency(expense.amount, expense.currency)}
                                 </Text>
                                 <Text style={[styles.listItemSubtitle, { color: colors.textSecondary }]}>
                                     {expense.description.substring(0, 30)}

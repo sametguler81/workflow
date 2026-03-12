@@ -294,7 +294,10 @@ export function ExpenseListScreen({ onNavigateDetail, onNavigateCreate, onBack, 
                             >
                                 <View style={styles.cardContent}>
                                     <View style={[styles.amountBadge, { backgroundColor: Colors.primary + '15' }]}>
-                                        <Text style={styles.amountText}>₺{item.amount.toFixed(2)}</Text>
+                                        <Text style={styles.amountText}>
+                                            {item.currency === 'USD' ? '$' : item.currency === 'EUR' ? '€' : '₺'}
+                                            {item.amount.toFixed(2)}
+                                        </Text>
                                     </View>
                                     <View style={styles.cardInfo}>
                                         <Text style={[styles.cardTitle, { color: colors.text }]}>
@@ -323,7 +326,10 @@ export function ExpenseListScreen({ onNavigateDetail, onNavigateCreate, onBack, 
                             >
                                 <View style={styles.cardContent}>
                                     <View style={[styles.amountBadge, { backgroundColor: Colors.primary + '15' }]}>
-                                        <Text style={styles.amountText}>₺{item.amount.toFixed(2)}</Text>
+                                        <Text style={styles.amountText}>
+                                            {item.currency === 'USD' ? '$' : item.currency === 'EUR' ? '€' : '₺'}
+                                            {item.amount.toFixed(2)}
+                                        </Text>
                                     </View>
                                     <View style={styles.cardInfo}>
                                         <Text style={[styles.cardTitle, { color: colors.text }]}>

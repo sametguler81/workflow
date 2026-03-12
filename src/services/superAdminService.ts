@@ -146,7 +146,7 @@ export async function getCompanyDetailById(companyId: string) {
     ]);
 
     const expenses = expensesSnap.docs.map((d: any) => d.data());
-    const totalExpenseAmount = expenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
+    const totalExpenseAmount = expenses.reduce((sum: number, e: any) => sum + (e.amountInTRY || e.amount || 0), 0);
 
     return {
         id: companyId,
@@ -373,15 +373,15 @@ export async function getPlatformReportStats() {
             pending: expenses.filter((e: any) => e.status === 'pending').length,
             approved: expenses.filter((e: any) => e.status === 'approved').length,
             rejected: expenses.filter((e: any) => e.status === 'rejected').length,
-            totalAmount: expenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0),
-            approvedAmount: expenses.filter((e: any) => e.status === 'approved').reduce((sum: number, e: any) => sum + (e.amount || 0), 0),
+            totalAmount: expenses.filter((e: any) => e.status !== 'rejected').reduce((sum: number, e: any) => sum + (e.amountInTRY || e.amount || 0), 0),
+            approvedAmount: expenses.filter((e: any) => e.status === 'approved').reduce((sum: number, e: any) => sum + (e.amountInTRY || e.amount || 0), 0),
         },
         invoices: {
             total: invoices.length,
             pending: invoices.filter((i: any) => i.status === 'pending').length,
             approved: invoices.filter((i: any) => i.status === 'approved').length,
             rejected: invoices.filter((i: any) => i.status === 'rejected').length,
-            totalAmount: invoices.reduce((sum: number, i: any) => sum + (i.amount || 0), 0),
+            totalAmount: invoices.filter((i: any) => i.status !== 'rejected').reduce((sum: number, i: any) => sum + (i.amountInTRY || i.amount || 0), 0),
         },
         users: {
             total: users.length,

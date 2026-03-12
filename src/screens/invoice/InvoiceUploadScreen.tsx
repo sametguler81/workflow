@@ -30,6 +30,8 @@ import { getCompany, Company } from '../../services/companyService';
 import { PLAN_DETAILS } from '../../constants/plans';
 import { createAnnouncement } from '../../services/announcementService';
 import { formatCurrencyInput, parseCurrencyToFloat } from '../../utils/currencyFormatter';
+import { CurrencySelector } from '../../components/CurrencySelector';
+import { CurrencyCode } from '../../services/currencyService';
 
 interface InvoiceUploadScreenProps {
     onBack: () => void;
@@ -61,6 +63,7 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
         const d = new Date();
         return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
     });
+    const [currency, setCurrency] = useState<CurrencyCode>(invoiceToEdit?.currency || 'TRY');
     const [dueDate, setDueDate] = useState(invoiceToEdit?.dueDate || '');
     const [description, setDescription] = useState(invoiceToEdit?.description || '');
     const [loading, setLoading] = useState(false);
@@ -85,6 +88,7 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
             setImageUri(invoiceToEdit.imageUri || invoiceToEdit.imageBase64 || '');
             setAmount(invoiceToEdit.amount ? formatCurrencyInput(invoiceToEdit.amount.toString().replace('.', ',')) : '');
             setDate(invoiceToEdit.date);
+            setCurrency(invoiceToEdit.currency || 'TRY');
             setDueDate(invoiceToEdit.dueDate || '');
             setDescription(invoiceToEdit.description || '');
             setFileName('Mevcut Belge');
@@ -95,6 +99,7 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
             setAmount('');
             const d = new Date();
             setDate(`${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`);
+            setCurrency('TRY');
             setDueDate('');
             setDescription('');
             setFileName('');
@@ -192,11 +197,12 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
                 await updateInvoice(invoiceToEdit.id, {
                     documentType: documentType || 'fatura',
                     amount: numericAmount,
+                    currency,
                     description: (description || fileName) || '',
                     date: date || new Date().toISOString(),
                     direction: direction || 'expense',
                     category: category || 'Diğer',
-                    imageUri: imageUri !== invoiceToEdit.imageUri && imageUri !== invoiceToEdit.imageBase64 ? imageUri : undefined, // Pass if changed
+                    imageUri: imageUri !== invoiceToEdit.imageUri && invoiceToEdit.imageBase64 !== imageUri ? imageUri : undefined, // Pass if changed
                     dueDate: dueDate ?? null,
                 });
                 Alert.alert('Başarılı', 'Belge güncellendi.', [
@@ -209,6 +215,7 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
                     companyId: profile.companyId,
                     documentType,
                     amount: numericAmount,
+                    currency,
                     description: description || fileName, // Use filename as fallback desc
                     imageUri: imageUri, // Pass the local file URI, the service will upload it
                     date,
@@ -412,9 +419,12 @@ export function InvoiceUploadScreen({ onBack, route }: InvoiceUploadScreenProps)
                             </View>
                         )}
 
+                        {/* Currency Selector */}
+                        <CurrencySelector value={currency} onChange={setCurrency} />
+
                         {/* Amount */}
                         <InputField
-                            label="Tutar (₺)"
+                            label={`Tutar (${currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '₺'})`}
                             icon="cash-outline"
                             placeholder="0.00"
                             value={amount}

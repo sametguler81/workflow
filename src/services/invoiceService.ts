@@ -15,6 +15,7 @@ import {
     FirebaseFirestoreTypes,
     deleteField,
 } from '@react-native-firebase/firestore';
+import { getStorage, ref, deleteObject } from '@react-native-firebase/storage';
 
 import { createAnnouncement } from './announcementService';
 import { notifyRolesInCompany, sendPushNotification } from './notificationService';
@@ -23,6 +24,8 @@ import { PLAN_DETAILS } from '../constants/plans';
 import { uploadFileToStorage, getFileSizeBytes } from './storageService';
 
 const db = getFirestore();
+
+import { CurrencyCode, convertToTRY } from './currencyService';
 
 export type DocumentType = 'fatura' | 'makbuz' | 'sozlesme' | 'diger';
 export type InvoiceStatus = 'pending' | 'approved' | 'rejected';
@@ -36,6 +39,9 @@ export interface Invoice {
     companyId: string;
     documentType: DocumentType;
     amount: number;
+    currency?: CurrencyCode;
+    amountInTRY?: number;
+    exchangeRate?: number;
     description: string;
     imageUri: string;
     imageBase64?: string | null;
@@ -124,6 +130,13 @@ export async function createInvoice(
 
     modifiedData.imageUri = downloadURL;
     delete modifiedData.imageBase64; // ensure we don't save any base64 string to Firestore
+
+    // Calculate amount in TRY using historical or current rates
+    const currency = modifiedData.currency || 'TRY';
+    const { amountInTRY, exchangeRate } = await convertToTRY(modifiedData.amount, currency, modifiedData.date);
+    modifiedData.amountInTRY = amountInTRY;
+    modifiedData.exchangeRate = exchangeRate;
+    modifiedData.currency = currency;
 
     const ref = await addDoc(collection(db, 'invoices'), {
         ...modifiedData,
@@ -342,6 +355,27 @@ export async function updateInvoice(
         }
     });
 
+    if (updateData.amount !== undefined || updateData.currency !== undefined) {
+        // If updating amount or currency, recalculate amountInTRY
+        let targetAmount = updateData.amount;
+        let targetCurrency = updateData.currency;
+        
+        if (targetAmount === undefined || targetCurrency === undefined) {
+            const currentDoc = await getDoc(doc(db, 'invoices', invoiceId));
+            if (currentDoc.exists()) {
+                const currentData = currentDoc.data() as Invoice;
+                if (targetAmount === undefined) targetAmount = currentData.amount;
+                if (targetCurrency === undefined) targetCurrency = currentData.currency || 'TRY';
+                if (!updateData.date) updateData.date = currentData.date;
+            }
+        }
+        
+        updateData.currency = targetCurrency || 'TRY';
+        const { amountInTRY, exchangeRate } = await convertToTRY(targetAmount || 0, updateData.currency, updateData.date);
+        updateData.amountInTRY = amountInTRY;
+        updateData.exchangeRate = exchangeRate;
+    }
+
     updateData = {
         ...updateData,
         updatedAt: new Date().toISOString(),
@@ -368,6 +402,16 @@ export async function deleteInvoice(invoiceId: string): Promise<void> {
             const sizeToReclaim = data.fileSizeBytes || 0;
             if (sizeToReclaim > 0) {
                 await updateCompanyStorageUsage(data.companyId, -sizeToReclaim);
+            }
+            // Delete actual file from Firebase Storage if it's a remote URL
+            if (data.imageUri && data.imageUri.startsWith('https://firebasestorage.googleapis.com')) {
+                try {
+                    const storage = getStorage();
+                    const fileRef = ref(storage, data.imageUri);
+                    await deleteObject(fileRef);
+                } catch (e) {
+                    console.log('Failed to delete file from storage', e);
+                }
             }
         }
     }

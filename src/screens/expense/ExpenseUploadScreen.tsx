@@ -24,6 +24,8 @@ import { PLAN_DETAILS } from '../../constants/plans';
 import { createAnnouncement } from '../../services/announcementService';
 import { formatCurrencyInput, parseCurrencyToFloat } from '../../utils/currencyFormatter';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
+import { CurrencySelector } from '../../components/CurrencySelector';
+import { CurrencyCode } from '../../services/currencyService';
 
 interface ExpenseUploadScreenProps {
     onBack: () => void;
@@ -46,6 +48,7 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
     });
     const [description, setDescription] = useState(expenseToEdit?.description || '');
     const [paymentMethod, setPaymentMethod] = useState<'personal' | 'company_card'>(expenseToEdit?.paymentMethod || 'personal');
+    const [currency, setCurrency] = useState<CurrencyCode>(expenseToEdit?.currency || 'TRY');
     const [loading, setLoading] = useState(false);
     const [fileName, setFileName] = useState(expenseToEdit ? 'Mevcut Belge' : '');
     const [fileType, setFileType] = useState<'image' | 'pdf'>('image');
@@ -68,6 +71,7 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
             setDate(expenseToEdit.date);
             setDescription(expenseToEdit.description || '');
             setPaymentMethod(expenseToEdit.paymentMethod || 'personal');
+            setCurrency(expenseToEdit.currency || 'TRY');
             setFileName('Mevcut Belge');
         } else {
             // Reset form if no expense to edit (e.g. going from Edit -> New)
@@ -77,6 +81,7 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
             setDate(`${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`);
             setDescription('');
             setPaymentMethod('personal');
+            setCurrency('TRY');
             setFileName('');
         }
     }, [expenseToEdit]);
@@ -299,6 +304,7 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
             if (expenseToEdit) {
                 await updateExpense(expenseToEdit.id, {
                     amount: numericAmount,
+                    currency,
                     description: (description || fileName) || '',
                     date: date || new Date().toISOString(),
                     paymentMethod: paymentMethod || 'personal',
@@ -313,6 +319,7 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
                     userName: profile.displayName,
                     companyId: profile.companyId,
                     amount: numericAmount,
+                    currency,
                     description: description || fileName, // Use filename as fallback desc
                     imageUri: imageUri, // Pass the local file URI, the service will upload it
                     date,
@@ -496,9 +503,12 @@ export function ExpenseUploadScreen({ onBack, route }: ExpenseUploadScreenProps)
                             </View>
                         )}
 
+                        {/* Currency Selector */}
+                        <CurrencySelector value={currency} onChange={setCurrency} />
+
                         {/* Amount */}
                         <InputField
-                            label="Tutar (₺)"
+                            label={`Tutar (${currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '₺'})`}
                             icon="cash-outline"
                             placeholder="0.00"
                             value={amount}

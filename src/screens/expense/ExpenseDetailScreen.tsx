@@ -234,7 +234,15 @@ export function ExpenseDetailScreen({ route, navigation }: ExpenseDetailScreenPr
 
                 <View style={detailStyles.amountContainer}>
                     <Text style={detailStyles.amountLabel}>Toplam Tutar</Text>
-                    <Text style={detailStyles.amountValue}>₺{expense.amount.toFixed(2)}</Text>
+                    <Text style={detailStyles.amountValue}>
+                        {expense.currency === 'USD' ? '$' : expense.currency === 'EUR' ? '€' : '₺'}
+                        {expense.amount.toFixed(2)}
+                    </Text>
+                    {expense.currency && expense.currency !== 'TRY' && expense.amountInTRY && (
+                        <Text style={[detailStyles.amountLabel, { marginTop: -4, marginBottom: 8 }]}>
+                            (₺{expense.amountInTRY.toFixed(2)})
+                        </Text>
+                    )}
                     <View style={detailStyles.statusBadgeContainer}>
                         <StatusBadge status={expense.status} />
                     </View>
@@ -264,6 +272,9 @@ export function ExpenseDetailScreen({ route, navigation }: ExpenseDetailScreenPr
                     <DetailRow icon="person-outline" label="Yükleyen" value={expense.userName} colors={colors} />
                     <DetailRow icon="calendar-outline" label="Tarih" value={expense.date} colors={colors} />
                     <DetailRow icon="document-text-outline" label="Açıklama" value={expense.description || '-'} colors={colors} />
+                    {expense.currency && expense.currency !== 'TRY' && expense.exchangeRate ? (
+                        <DetailRow icon="cash-outline" label="Uygulanan Kur" value={`1 ${expense.currency} = ${expense.exchangeRate.toFixed(4)} ₺`} colors={colors} />
+                    ) : null}
                     <DetailRow icon="time-outline" label="Oluşturulma" value={new Date(expense.createdAt).toLocaleDateString('tr-TR')} colors={colors} isLast={!expense.reviewedBy && !expense.reviewNote} />
 
                     {expense.reviewedBy && (

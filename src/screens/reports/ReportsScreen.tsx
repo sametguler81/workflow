@@ -165,9 +165,9 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
         pending: expenses.filter(e => e.status === 'pending').length,
         approved: expenses.filter(e => e.status === 'approved').length,
         rejected: expenses.filter(e => e.status === 'rejected').length,
-        totalAmount: expenses.reduce((sum, e) => sum + (e.amount || 0), 0),
-        approvedAmount: expenses.filter(e => e.status === 'approved').reduce((sum, e) => sum + (e.amount || 0), 0),
-        pendingAmount: expenses.filter(e => e.status === 'pending').reduce((sum, e) => sum + (e.amount || 0), 0),
+        totalAmount: expenses.filter(e => e.status !== 'rejected').reduce((sum, e) => sum + (e.amountInTRY || e.amount || 0), 0),
+        approvedAmount: expenses.filter(e => e.status === 'approved').reduce((sum, e) => sum + (e.amountInTRY || e.amount || 0), 0),
+        pendingAmount: expenses.filter(e => e.status === 'pending').reduce((sum, e) => sum + (e.amountInTRY || e.amount || 0), 0),
         byMethod: {
             company_card: expenses.filter(e => e.paymentMethod === 'company_card').length,
             personal: expenses.filter(e => e.paymentMethod === 'personal').length,
@@ -179,7 +179,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
         pending: invoices.filter(i => i.status === 'pending').length,
         approved: invoices.filter(i => i.status === 'approved').length,
         rejected: invoices.filter(i => i.status === 'rejected').length,
-        totalAmount: invoices.reduce((sum, i) => sum + (i.amount || 0), 0),
+        totalAmount: invoices.filter(i => i.status !== 'rejected').reduce((sum, i) => sum + (i.amountInTRY || i.amount || 0), 0),
         byType: {
             fatura: invoices.filter(i => i.documentType === 'fatura').length,
             makbuz: invoices.filter(i => i.documentType === 'makbuz').length,
@@ -205,6 +205,13 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
     };
 
     const formatCurrency = (n: number) => `₺${n.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`;
+    
+    // Fallback format specific to the original currency code for individual items
+    const formatItemCurrency = (amount: number, currencyCode?: string) => {
+        const code = currencyCode || 'TRY';
+        return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: code }).format(amount);
+    };
+
     const formatDate = (d: string) => parseDate(d).toLocaleDateString('tr-TR');
 
     const allTabs: { key: TabKey; label: string; icon: string }[] = [
@@ -353,7 +360,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                         title={e.userName}
                         subtitle={`${formatDate(e.date)} • ${e.paymentMethod === 'company_card' ? 'Şirket Kartı' : 'Kendi Cebinden'}`}
                         status={e.status}
-                        amount={formatCurrency(e.amount)}
+                        amount={formatItemCurrency(e.amount, e.currency)}
                         onPress={() => handleExpensePress(e.id)}
                     />
                 ))}
@@ -419,7 +426,7 @@ export function ReportsScreen({ onBack }: ReportsScreenProps) {
                         title={i.userName}
                         subtitle={`${DOCUMENT_TYPE_LABELS[i.documentType]} • ${formatDate(i.date)}`}
                         status={i.status}
-                        amount={formatCurrency(i.amount)}
+                        amount={formatItemCurrency(i.amount, i.currency)}
                         onPress={() => handleInvoicePress(i.id)}
                     />
                 ))}

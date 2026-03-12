@@ -232,7 +232,15 @@ export function InvoiceDetailScreen({ route, navigation }: InvoiceDetailScreenPr
 
                 <View style={detailStyles.amountContainer}>
                     <Text style={detailStyles.amountLabel}>Tutar</Text>
-                    <Text style={detailStyles.amountValue}>₺{invoice.amount.toFixed(2)}</Text>
+                    <Text style={detailStyles.amountValue}>
+                        {invoice.currency === 'USD' ? '$' : invoice.currency === 'EUR' ? '€' : '₺'}
+                        {invoice.amount.toFixed(2)}
+                    </Text>
+                    {invoice.currency && invoice.currency !== 'TRY' && invoice.amountInTRY && (
+                        <Text style={[detailStyles.amountLabel, { marginTop: -4, marginBottom: 8 }]}>
+                            (₺{invoice.amountInTRY.toFixed(2)})
+                        </Text>
+                    )}
                     <View style={detailStyles.statusBadgeContainer}>
                         <StatusBadge status={invoice.status} />
                     </View>
@@ -263,6 +271,9 @@ export function InvoiceDetailScreen({ route, navigation }: InvoiceDetailScreenPr
                     <DetailRow icon="calendar-outline" label="Tarih" value={invoice.date} colors={colors} />
                     <DetailRow icon="document-text-outline" label="Belge Türü" value={invoice.documentType.toUpperCase()} colors={colors} />
                     <DetailRow icon="list-outline" label="Açıklama" value={invoice.description || '-'} colors={colors} />
+                    {invoice.currency && invoice.currency !== 'TRY' && invoice.exchangeRate ? (
+                        <DetailRow icon="cash-outline" label="Uygulanan Kur" value={`1 ${invoice.currency} = ${invoice.exchangeRate.toFixed(4)} ₺`} colors={colors} />
+                    ) : null}
                     {invoice.dueDate && (
                         <DetailRow icon="alarm-outline" label="Vade Tarihi" value={invoice.dueDate} colors={colors} />
                     )}

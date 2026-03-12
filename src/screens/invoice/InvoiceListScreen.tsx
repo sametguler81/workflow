@@ -191,7 +191,10 @@ export function InvoiceListScreen({ onNavigateDetail, onNavigateCreate, onBack, 
                     </View>
                 </View>
                 <View style={styles.cardRight}>
-                    <Text style={[styles.cardAmount, { color: colors.text }]}>₺{item.amount.toFixed(2)}</Text>
+                    <Text style={[styles.cardAmount, { color: colors.text }]}>
+                        {item.currency === 'USD' ? '$' : item.currency === 'EUR' ? '€' : '₺'}
+                        {item.amount.toFixed(2)}
+                    </Text>
                     <StatusBadge status={item.status} size="sm" />
                 </View>
             </TouchableOpacity>

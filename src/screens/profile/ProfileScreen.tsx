@@ -37,7 +37,7 @@ interface ProfileScreenProps {
 }
 
 export function ProfileScreen({ onBack }: ProfileScreenProps) {
-    const { profile } = useAuth();
+    const { profile, setProfile } = useAuth();
     const { colors } = useTheme();
     const [uploading, setUploading] = React.useState(false);
 
@@ -63,12 +63,16 @@ export function ProfileScreen({ onBack }: ProfileScreenProps) {
                 const imageUri = result.assets[0].uri;
                 const destination = `companies/${profile.companyId}/profiles/${profile.uid}`;
 
-                // Upload to Firebase Storage
-                const downloadURL = await uploadFileToStorage(imageUri, destination);
+                // Upload to Firebase Storage and get the URL string
+                const { downloadURL } = await uploadFileToStorage(imageUri, destination);
 
                 // Update the user document in Firestore with the Storage URL
                 await updateUserProfile(profile.uid, { photoURL: downloadURL });
-                Alert.alert('Başarılı', 'Profil fotoğrafı güncellendi! (Uygulamayı yeniden başlattığınızda her yerde görünecektir)');
+                
+                // Update local auth context to show new photo immediately
+                setProfile({ ...profile, photoURL: downloadURL });
+                
+                Alert.alert('Başarılı', 'Profil fotoğrafı başarıyla güncellendi!');
             }
         } catch (error) {
             console.error(error);

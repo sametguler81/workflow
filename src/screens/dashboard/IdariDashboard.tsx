@@ -84,7 +84,7 @@ export function IdariDashboard({
             // Status=Approved, Method=Personal, IsReimbursed!=true
             const receivables = eRes.data
                 .filter((e: Expense) => e.userId === profile.uid && e.status === 'approved' && e.paymentMethod === 'personal' && !e.isReimbursed)
-                .reduce((sum: number, e: Expense) => sum + Number(e.amount || 0), 0);
+                .reduce((sum: number, e: Expense) => sum + Number(e.amountInTRY || e.amount || 0), 0);
 
             setMyReceivables(receivables);
 
